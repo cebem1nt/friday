@@ -21,15 +21,17 @@ class CLI:
                 live.update(Markdown(content))
 
     def __ask_no_rich(self, prompt: str):
-        for chunk in self.fr.ask(prompt):
+        for chunk in self.fr.speak(self.fr.ask(prompt)):
             print(chunk, flush=True, end='')
         
 
     def chat(self):
         while True:
             prompt = input(">> ")
-            
-            if HAS_RICH: 
+            if prompt == "/quit":
+                return
+
+            if False: 
                 self.__ask_rich(prompt)
             else: 
                 self.__ask_no_rich(prompt)
