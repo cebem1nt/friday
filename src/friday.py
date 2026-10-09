@@ -1,25 +1,27 @@
 import ollama, sys, os
 
 from datetime import datetime
+from cli import CLI
 
 def today():
     return datetime.today().strftime('%Y-%m-%d')
 
-class Chat:
-    max_tool_calls_rounds = 6
+class Friday:
+    max_tool_calls_rounds = 10
 
     def __init__(
         self, 
         enable_web_search: bool = False
     ):
+        # self.model = "qwen3.5:9b-q4_K_M"
         self.model = "gemma4:e4b"
         self.tools = {}
         self.messages = [{ 
             "role": "system", 
             "content": (
-                "You're friday: local AI assistant. Do not treat user as dumb by default, be serious, simple, but helpfull."
+                "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default."
                 "Be brief, unless necessary. Never use emoji! Do not use exscessive markdown formatting! Answer directly and concisely. Avoid unnecessary analysis."
-                f"Date today: {today()}"
+                f"Speak in english by default. Date today: {today()}"
             )
         }]
 
@@ -43,8 +45,8 @@ class Chat:
             stream = ollama.chat(
                 model=self.model,
                 messages=self.messages,
-                stream=True,
-                tools=self.tools.values() if self.tools else None  
+                tools=self.tools.values() if self.tools else None,
+                stream=True
             )
 
             content = ""
@@ -55,29 +57,30 @@ class Chat:
 
                 if message.content:
                     content += message.content
-                    print(message.content, flush=True, end='')
+                    yield message.content
 
                 if message.tool_calls:
-                    print(f"Using tool(s): {message.tool_calls}")
+                    yield f"Using tool(s): {message.tool_calls}"
                     tool_calls.extend(message.tool_calls)
 
-            if not tool_calls:
-                print()
-                return
-
-            self.messages.append({
+            message = {
                 "role": "assistant",
                 "content": content,
-                "tool_calls": [
-                    {
-                        "function": {
-                            "name": call.function.name,
-                            "arguments": call.function.arguments,
-                        }
-                    }
-                    for call in tool_calls
-                ],
-            })
+            }
+
+            if not tool_calls:
+                self.messages.append(message)
+                yield '\n'
+                return
+            
+            message["tool_calls"] = [{
+                "function": {
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
+                }
+            } for call in tool_calls]
+
+            self.messages.append(message)
 
             for call in tool_calls:
                 name = call.function.name
@@ -95,19 +98,9 @@ class Chat:
                     "content": str(result),
                 })
 
-        print("Stopped, tool-call limit was hit")
-
-    def interactive(self):
-        while True:
-            prompt = input(">> ")
-
-            if prompt == "/quit":
-                return
-            
-            self.ask(prompt)
+        # TODO no good
+        yield "Stopped, tool-call limit was hit"
 
 if __name__ == "__main__":
-    c = Chat(enable_web_search=True)
-    c.interactive()
-
-    print(c.messages)
+    c = CLI(Friday(enable_web_search=True))
+    c.chat()
