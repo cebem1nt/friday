@@ -14,4 +14,4 @@ voice_model = "/home/cebem1nt/voices/en_US-ljspeech-high.onnx"
 
 whisper_model = "small.en"
 
-rich_formatting = False
+rich_formatting = True

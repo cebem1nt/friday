@@ -74,7 +74,8 @@ class Friday:
                 model=self.model,
                 messages=self.messages,
                 tools=self.tools.values() if self.tools else None,
-                stream=True
+                stream=True,
+                keep_alive=True
             )
 
             content = ""
@@ -85,10 +86,14 @@ class Friday:
 
                 if message.content:
                     content += message.content
-                    yield message.content
+                    yield "message", message.content
 
                 if message.tool_calls:
+                    yield "system", f"Using tool(s): {message.tool_calls}\n"
                     tool_calls.extend(message.tool_calls)
+
+                if message.thinking:
+                    yield "thinking", message.thinking
 
             message = {
                 "role": "assistant",
@@ -97,7 +102,7 @@ class Friday:
 
             if not tool_calls:
                 self.messages.append(message)
-                yield '\n'
+                yield "message", '\n'
                 return
             
             message["tool_calls"] = [{
@@ -126,7 +131,7 @@ class Friday:
                 })
 
         # TODO no good
-        yield "Stopped, tool-call limit was hit"
+        yield "system", "Stopped, tool-call limit was hit\n"
 
     def say(self, text: str):
         for chunk in self.voice.synthesize(
@@ -135,11 +140,15 @@ class Friday:
         ):
             self._output_stream.write(chunk.audio_int16_bytes)
 
-    def speak(self, text_stream):
+    def aloud(self, response_stream):
         buffer = ""
 
-        for text in text_stream:
-            yield text
+        for text_type, text in response_stream:
+            yield text_type, text
+
+            if not text_type != "message":
+                continue
+
             buffer += text
 
             while match := re.search(r"[.!?](?:\s|$)", buffer):

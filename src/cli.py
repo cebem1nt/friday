@@ -15,17 +15,39 @@ class CLI:
     def __ask_rich(self, prompt: str):
         console = Console()
         content = ""
+        
+        is_thinking = False
+        i = 1
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
-            for chunk in self.fr.speak(self.fr.ask(prompt)):
-                content += chunk
+            for chunk_type, chunk in self.fr.aloud(self.fr.ask(prompt)):
+                if chunk_type == "thinking":
+                    if not is_thinking:
+                        is_thinking = True
+
+                    content = "Thinking"
+                    content += "." * i
+                    i = ((i % 4) + 1)
+                else:
+                    if is_thinking:
+                        content = ""
+                        is_thinking = False
+
+                    content += chunk
+                
                 live.update(Markdown(content))
 
     def __ask_no_rich(self, prompt: str):
-        for chunk in self.fr.speak(self.fr.ask(prompt)):
-            print(chunk, flush=True, end='')
-        
+        is_thinking = False
 
+        for chunk_type, chunk in self.fr.aloud(self.fr.ask(prompt)):
+            if chunk_type == "thinking":
+                if not is_thinking:
+                    print("Thinking...")
+                    is_thinking = True
+            else:
+                print(chunk, flush=True, end='')
+        
     def chat(self):
         while True:
             prompt = input(">> ")
