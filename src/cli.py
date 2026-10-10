@@ -1,3 +1,4 @@
+import utils, config
 
 try:
     from rich.console import Console
@@ -16,7 +17,7 @@ class CLI:
         content = ""
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
-            for chunk in self.fr.ask(prompt):
+            for chunk in self.fr.speak(self.fr.ask(prompt)):
                 content += chunk
                 live.update(Markdown(content))
 
@@ -28,10 +29,22 @@ class CLI:
     def chat(self):
         while True:
             prompt = input(">> ")
+
             if prompt == "/quit":
                 return
 
-            if False: 
+            if prompt == "/record":
+                chunks = []
+
+                with utils.record_audio(
+                    callback=lambda indata, _, _1, _2: chunks.append(indata.copy())
+                ):
+                    input("Recording, press ENTER to stop")
+
+                prompt = self.fr.transcribe(chunks)
+                print(f">> {prompt}")
+
+            if HAS_RICH and config.rich_formatting: 
                 self.__ask_rich(prompt)
             else: 
                 self.__ask_no_rich(prompt)
