@@ -1,4 +1,4 @@
-import utils, config
+import common, config
 
 try:
     from rich.console import Console
@@ -20,7 +20,7 @@ class CLI:
         i = 1
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
-            for chunk_type, chunk in self.fr.aloud(self.fr.ask(prompt)):
+            for chunk_type, chunk in self.fr.ask(prompt, aloud=True):
                 if chunk_type == "thinking":
                     if not is_thinking:
                         is_thinking = True
@@ -40,7 +40,7 @@ class CLI:
     def __ask_no_rich(self, prompt: str):
         is_thinking = False
 
-        for chunk_type, chunk in self.fr.aloud(self.fr.ask(prompt)):
+        for chunk_type, chunk in self.fr.ask(prompt, aloud=True):
             if chunk_type == "thinking":
                 if not is_thinking:
                     print("Thinking...")
@@ -50,7 +50,10 @@ class CLI:
         
     def chat(self):
         while True:
-            prompt = input(">> ")
+            try:
+                prompt = input(">> ")
+            except (EOFError, KeyboardInterrupt):
+                return
 
             if prompt == "/quit":
                 return
@@ -58,8 +61,8 @@ class CLI:
             if prompt == "/record":
                 chunks = []
 
-                with utils.record_audio(
-                    callback=lambda indata, _, _1, _2: chunks.append(indata.copy())
+                with common.record_audio(
+                    callback=lambda indata: chunks.append(indata.copy())
                 ):
                     input("Recording, press ENTER to stop")
 

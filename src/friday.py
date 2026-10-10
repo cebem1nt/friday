@@ -1,34 +1,23 @@
-import ollama, sys, os, re, whisper
+import ollama, os
 
-import numpy as np
-import sounddevice as sd
-
-from piper import PiperVoice, SynthesisConfig
-from concurrent.futures import ThreadPoolExecutor
 from cli import CLI
+from voice import VoiceProvider
 
-import config, utils, tools
+import config, common, tools
 
-class Friday:
+# TODO we need a more smart message history
+# It's going to be a single chat model, i want an sqllite db storing all time conversations
+# it will have a tool to search for some things in the history
+
+class Friday(VoiceProvider):
     max_tool_calls_rounds = 10
 
     def __init__(
         self, 
         enable_web_search: bool = False
     ):
+        super().__init__()
         self.model = config.model
-        self.voice = PiperVoice.load(config.voice_model)
-        self.whisper = whisper.load_model(config.whisper_model)
-
-        self._speech_executor = ThreadPoolExecutor(max_workers=1)
-        
-        self._output_stream = sd.RawOutputStream(
-            samplerate=self.voice.config.sample_rate,
-            channels=1,
-            dtype="int16",
-        )
-
-        self._output_stream.start()
         
         self.tools = {}
         self.messages = [{ 
@@ -61,12 +50,7 @@ class Friday:
                 "content": "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them."
             })
 
-    def transcribe(self, chunks):
-        audio = np.concatenate(chunks).flatten()
-        result = self.whisper.transcribe(audio, fp16=False)
-        return result["text"].strip()
-
-    def ask(self, prompt: str):
+    def __ask_stream(self, prompt: str):
         self.messages.append({ "role": "user", "content": prompt})
 
         for _ in range(self.max_tool_calls_rounds):
@@ -86,7 +70,7 @@ class Friday:
 
                 if message.content:
                     content += message.content
-                    yield "message", message.content
+                    yield "response", message.content
 
                 if message.tool_calls:
                     yield "system", f"Using tool(s): {message.tool_calls}\n"
@@ -102,7 +86,7 @@ class Friday:
 
             if not tool_calls:
                 self.messages.append(message)
-                yield "message", '\n'
+                yield "response", '\n'
                 return
             
             message["tool_calls"] = [{
@@ -133,38 +117,16 @@ class Friday:
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def say(self, text: str):
-        for chunk in self.voice.synthesize(
-            text,
-            syn_config=SynthesisConfig(length_scale=0.7),
-        ):
-            self._output_stream.write(chunk.audio_int16_bytes)
+    def ask(self, prompt: str, aloud=False):
+        for message_type, message_chunk in self.__ask_stream(prompt):
 
-    def aloud(self, response_stream):
-        buffer = ""
-
-        for text_type, text in response_stream:
-            yield text_type, text
-
-            if not text_type != "message":
-                continue
-
-            buffer += text
-
-            while match := re.search(r"[.!?](?:\s|$)", buffer):
-                sentence = buffer[:match.end()].strip()
-                buffer = buffer[match.end():]
-
-                if sentence:
-                    self._speech_executor.submit(self.say, sentence)
-
-        if buffer.strip():
-            self._speech_executor.submit(self.say, buffer.strip())
-
-    def close(self):
-        self._speech_executor.shutdown(wait=True)
-        self._output_stream.stop()
-        self._output_stream.close()
+            if aloud and message_type == "response":
+                self.speak(message_chunk)
+            
+            yield message_type, message_chunk
+        
+        if aloud:
+            self.done_speaking()
 
 if __name__ == "__main__":
     fr = Friday(enable_web_search=True)
