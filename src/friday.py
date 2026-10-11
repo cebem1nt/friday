@@ -131,10 +131,3 @@ class Friday(VoiceProvider):
         
         if aloud:
             self.done_speaking()
-
-if __name__ == "__main__":
-    fr = Friday(enable_web_search=True)
-    c = CLI(fr)
-    c.chat()
-
-    print(fr.messages)

@@ -3,13 +3,13 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 import numpy as np
 import sounddevice as sd
-import whisper, re
+import re, whisper
 
 import config, os, queue, threading
 
 class VoiceProvider:
     def __init__(self):
-        self.voice = PiperVoice.load(config.get("tts", "model_path", os.path.expanduser))
+        self.piper = PiperVoice.load(config.get("tts", "model_path", os.path.expanduser))
         self.whisper = whisper.load_model(config.get("stt", "model"))
 
         self.syn_config = SynthesisConfig(
@@ -26,14 +26,14 @@ class VoiceProvider:
 
         self._stream_lock = threading.Lock()
         self._output_stream = sd.RawOutputStream(
-            samplerate=self.voice.config.sample_rate,
+            samplerate=self.piper.config.sample_rate,
             channels=1,
             dtype="int16",
         )
         self._output_stream.start()
 
     def _synthesize(self, text: str, generation: int):
-        for chunk in self.voice.synthesize(text, syn_config=self.syn_config):
+        for chunk in self.piper.synthesize(text, syn_config=self.syn_config):
             if generation != self._generation:
                 return
 
@@ -55,9 +55,8 @@ class VoiceProvider:
         Unbuffered -> gets text -> says it
         """
 
-        generation = self._generation
         return self._speech_executor.submit(
-            self._synthesize, text, generation)
+            self._synthesize, text, self._generation)
 
     def speak(self, text: str):
         """
@@ -78,6 +77,7 @@ class VoiceProvider:
                     sentences.append(sentence)
 
         generation = self._generation
+
         for sentence in sentences:
             self._speech_executor.submit(
                 self._synthesize, sentence, generation
@@ -93,8 +93,7 @@ class VoiceProvider:
             self._speech_buffer = ""
 
         if text:
-            generation = self._generation
-            self._speech_executor.submit(self._synthesize, text, generation)
+            self._speech_executor.submit(self._synthesize, text, self._generation)
 
     def interrupt_speaking(self):        
         with self._buffer_lock:
