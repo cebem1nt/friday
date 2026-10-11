@@ -1,9 +1,7 @@
 import ollama, os
 
-from cli import CLI
-from voice import VoiceProvider
-
-import config, helpers, tools
+from src.voice import VoiceProvider
+from src import config, helpers, tools
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
@@ -18,7 +16,6 @@ class Friday(VoiceProvider):
     ):
         super().__init__()
         self.model = config.get("ai", "model")
-        self._is_speaking = False
 
         self.tools = {}
         self.messages = [{ 
@@ -118,7 +115,7 @@ class Friday(VoiceProvider):
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def ask(self, prompt: str, aloud=False):
+    def ask(self, prompt: str, aloud=True):
         if aloud:
             # Interrupts previous speaking 
             self.interrupt_speaking()

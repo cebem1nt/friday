@@ -3,9 +3,9 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 import numpy as np
 import sounddevice as sd
-import re, whisper
+import re, whisper, os, queue, threading
 
-import config, os, queue, threading
+from src import config
 
 class VoiceProvider:
     def __init__(self):

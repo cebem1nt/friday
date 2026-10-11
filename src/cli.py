@@ -1,4 +1,5 @@
-import helpers, config
+from src import helpers, config
+from src.ipc.client import FridayClient
 
 try:
     import readline
@@ -14,8 +15,8 @@ except (ImportError):
     HAS_RICH = False
 
 class CLI:
-    def __init__(self, friday):
-        self.fr = friday
+    def __init__(self, friday_client: FridayClient):
+        self.fr = friday_client
 
     def __ask_rich(self, prompt: str):
         console = Console()
@@ -26,7 +27,7 @@ class CLI:
         i = 1
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
-            for chunk_type, chunk in self.fr.ask(prompt, aloud=True):
+            for chunk_type, chunk in self.fr.ask(prompt):
                 
                 if chunk_type == "thinking":
                     if not is_thinking:
@@ -49,7 +50,7 @@ class CLI:
     def __ask_no_rich(self, prompt: str):
         is_thinking = False
 
-        for chunk_type, chunk in self.fr.ask(prompt, aloud=True):
+        for chunk_type, chunk in self.fr.ask(prompt):
             if chunk_type == "thinking":
                 if not is_thinking:
                     print("Thinking...")
