@@ -24,7 +24,7 @@ class VoiceProvider:
         self._output_stream.start()
 
     def transcribe(self, audio_chunks):
-        audio = np.concatenate(chunks).flatten()
+        audio = np.concatenate(audio_chunks).flatten()
         result = self.whisper.transcribe(audio, fp16=False)
         return result["text"].strip()
 

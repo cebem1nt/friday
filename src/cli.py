@@ -1,4 +1,4 @@
-import common, config
+import helpers, config
 
 try:
     from rich.console import Console
@@ -17,15 +17,19 @@ class CLI:
         content = ""
         
         is_thinking = False
+        thinking_quote = ""
         i = 1
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
             for chunk_type, chunk in self.fr.ask(prompt, aloud=True):
+                
                 if chunk_type == "thinking":
                     if not is_thinking:
+                        thinking_quote = helpers.random_thinking_quote()
+                        self.fr.say(thinking_quote)
                         is_thinking = True
 
-                    content = "Thinking"
+                    content = thinking_quote
                     content += "." * i
                     i = ((i % 4) + 1)
                 else:
@@ -61,8 +65,8 @@ class CLI:
             if prompt == "/record":
                 chunks = []
 
-                with common.record_audio(
-                    callback=lambda indata: chunks.append(indata.copy())
+                with helpers.record_audio(
+                    callback=lambda indata, _, _1, _2: chunks.append(indata.copy())
                 ):
                     input("Recording, press ENTER to stop")
 

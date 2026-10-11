@@ -3,7 +3,7 @@ import ollama, os
 from cli import CLI
 from voice import VoiceProvider
 
-import config, common, tools
+import config, helpers, tools
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
@@ -27,7 +27,7 @@ class Friday(VoiceProvider):
                 "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
                 "You're speaking assistant, that means your responses are spoken aloud, Do not use markdown formatting at all! "
                 "You can ask questions if it helps to do what user wants or improve preciseness of your response"
-                f"Speak in english by default. Date today: {utils.today()}"
+                f"Speak in english by default. Date today: {helpers.today()}"
             )
         }]
 
@@ -59,7 +59,7 @@ class Friday(VoiceProvider):
                 messages=self.messages,
                 tools=self.tools.values() if self.tools else None,
                 stream=True,
-                keep_alive=True
+                keep_alive="30m" # TODO, might need a better handling
             )
 
             content = ""
