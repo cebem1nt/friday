@@ -18,6 +18,7 @@ class Friday(VoiceProvider):
     ):
         super().__init__()
         self.model = config.get("ai", "model")
+        self._is_speaking = False
 
         self.tools = {}
         self.messages = [{ 
@@ -41,7 +42,7 @@ class Friday(VoiceProvider):
                 "web_search": tools.web_search, 
                 "web_fetch": tools.web_fetch, 
                 "run_application": tools.run_application,
-                "get_all_applications": tools.get_all_applications
+                "get_all_applications": tools.get_all_applications,
                 # "find_applications": tools.find_applications,
             }
 
@@ -59,7 +60,7 @@ class Friday(VoiceProvider):
                 messages=self.messages,
                 tools=self.tools.values() if self.tools else None,
                 stream=True,
-                keep_alive="30m" # TODO, might need a better handling
+                keep_alive=config.get("ai", "keep_alive")
             )
 
             content = ""
@@ -118,8 +119,11 @@ class Friday(VoiceProvider):
         yield "system", "Stopped, tool-call limit was hit\n"
 
     def ask(self, prompt: str, aloud=False):
-        for message_type, message_chunk in self.__ask_stream(prompt):
+        if aloud:
+            # Interrupts previous speaking 
+            self.interrupt_speaking()
 
+        for message_type, message_chunk in self.__ask_stream(prompt):
             if aloud and message_type == "response":
                 self.speak(message_chunk)
             

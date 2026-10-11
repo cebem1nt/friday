@@ -1,6 +1,11 @@
 import helpers, config
 
 try:
+    import readline
+except:
+    pass
+
+try:
     from rich.console import Console
     from rich.live import Live
     from rich.markdown import Markdown
@@ -72,10 +77,13 @@ class CLI:
 
                 prompt = self.fr.transcribe(chunks)
                 print(f">> {prompt}")
-
-            if HAS_RICH and config.get("misc", "rich_formatting"): 
-                self.__ask_rich(prompt)
-            else: 
-                self.__ask_no_rich(prompt)
-
+            
+            try:
+                if HAS_RICH and config.get("misc", "rich_formatting"): 
+                    self.__ask_rich(prompt)
+                else: 
+                    self.__ask_no_rich(prompt)
+            except (EOFError, KeyboardInterrupt):
+                self.fr.interrupt_speaking()
+                return
             

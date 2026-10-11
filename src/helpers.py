@@ -20,8 +20,8 @@ def random_thinking_quote():
         "Let me think about it",
         "I should think about it",
         "I'm thinking",
-        "Okay, let me think a moment",
+        "Okay, let me think for a moment",
         "Thinking",
         "I have to think about it",
-        "Wait pleas, I gotta think"
+        "Wait please, I gotta think"
     ])

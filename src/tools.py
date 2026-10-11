@@ -104,3 +104,15 @@ def get_all_applications():
     for f in os.listdir(global_apps): matches.append(f)
 
     return sorted(set(matches), key=str.casefold)
+
+# def rick_roll(name: str):
+#     """
+#     Open website with given name
+#     """
+
+#     subprocess.run(["zen", "--new-window", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1&pp=ygUXbmV2ZXIgZ29ubmEgZ2l2ZSB5b3UgdXCgBwE%3D"])
+#     subprocess.run("sleep 5", shell=True)
+#     subprocess.run("ydotool mousemove --absolute 450 250", shell=True)
+#     subprocess.run("ydotool click 0xC0", shell=True)
+
+#     return "Succes!"
