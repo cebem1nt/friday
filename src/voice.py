@@ -5,12 +5,12 @@ import numpy as np
 import sounddevice as sd
 import whisper, re
 
-import config
+import config, os
 
 class VoiceProvider:
     def __init__(self):
-        self.voice = PiperVoice.load(config.voice_model)
-        self.whisper = whisper.load_model(config.whisper_model)
+        self.voice = PiperVoice.load(config.get("tts", "model_path", os.path.expanduser))
+        self.whisper = whisper.load_model(config.get("stt", "model"))
 
         self._speech_executor = ThreadPoolExecutor(max_workers=1)
         self._speech_buffer = ""
@@ -19,6 +19,10 @@ class VoiceProvider:
             samplerate=self.voice.config.sample_rate,
             channels=1,
             dtype="int16",
+        )
+
+        self.syn_config = SynthesisConfig(
+            length_scale=config.get("tts", "voice_scale", float)
         )
 
         self._output_stream.start()
@@ -33,10 +37,7 @@ class VoiceProvider:
         Unbuffered -> gets text -> says it
         """
 
-        for chunk in self.voice.synthesize(
-            text,
-            syn_config=SynthesisConfig(length_scale=0.7),
-        ):
+        for chunk in self.voice.synthesize(text, syn_config=self.syn_config):
             self._output_stream.write(chunk.audio_int16_bytes)
 
     def speak(self, text: str):

@@ -1,17 +1,43 @@
-# TODO config parsing or per chat settings
+import os
+from configparser import ConfigParser
+from typing import Any
 
-model = "gemma4:e4b"
+CONFIG_HOME = os.path.expanduser("~/.config/")
+CONFIG_PATHS = [
+    os.path.join(os.getenv("XDG_CONFIG_HOME", CONFIG_HOME), "friday", "config.ini"),
+    "/etc/friday/config.ini"
+]
 
-voice_model = "/home/cebem1nt/voices/en_US-ljspeech-high.onnx" 
+_config = None
 
-# Size 	  Parameters  English-only model  Multilingual model 	Required VRAM 	Relative speed
-# tiny 	    39 M 	     tiny.en 	           tiny 	            ~1 GB 	         ~10x
-# base 	    74 M 	     base.en 	           base 	            ~1 GB 	         ~7x
-# small 	244 M 	     small.en 	           small 	            ~2 GB 	         ~4x
-# medium 	769 M 	     medium.en 	           medium 	            ~5 GB 	         ~2x
-# large 	1550 M 	     N/A 	               large 	            ~10 GB 	         1x
-# turbo 	809 M 	     N/A 	               turbo 	            ~6 GB 	         ~8x
+def _populate_config():
+    global _config
 
-whisper_model = "small.en"
+    parser = ConfigParser(
+        inline_comment_prefixes=("#")
+    )
 
-rich_formatting = True
+    for config_path in CONFIG_PATHS:
+        if os.path.exists(config_path):
+            parser.read(config_path)
+        
+            _config = {
+                section: dict(parser[section]) for section in parser.sections()
+            }
+
+            break
+    else:
+        raise Exception("No config file!")
+
+def get(group: str, opt: str, _type=str):
+    if _config is None:
+        _populate_config()
+
+    return _type(_config[group][opt])
+    
+# Hell yeah, im going to make friday be able to modify itself at runtime
+def set(group: str, opt: str, value: Any):
+    if _config is None:
+        _populate_config()
+
+    _config[group][opt] = str(value)

@@ -73,7 +73,7 @@ class CLI:
                 prompt = self.fr.transcribe(chunks)
                 print(f">> {prompt}")
 
-            if HAS_RICH and config.rich_formatting: 
+            if HAS_RICH and config.get("misc", "rich_formatting"): 
                 self.__ask_rich(prompt)
             else: 
                 self.__ask_no_rich(prompt)

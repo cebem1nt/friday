@@ -17,8 +17,8 @@ class Friday(VoiceProvider):
         enable_web_search: bool = False
     ):
         super().__init__()
-        self.model = config.model
-        
+        self.model = config.get("ai", "model")
+
         self.tools = {}
         self.messages = [{ 
             "role": "system", 
