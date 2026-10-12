@@ -103,7 +103,6 @@ class VoiceProvider:
         with self._stream_lock:
             pass
         
-    def transcribe(self, audio_chunks):
-        audio = np.concatenate(audio_chunks).flatten()
+    def transcribe(self, audio: np.ndarray):
         result = self.whisper.transcribe(audio, fp16=False)
         return result["text"].strip()

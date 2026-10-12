@@ -1,44 +1,79 @@
 import socket, os, json
+import numpy as np
 
-from typing import Any
+from typing import Any, BinaryIO
+from multiprocessing import shared_memory
+from contextlib import contextmanager
 
 SOCKET_PATH = os.path.join(
     os.environ["XDG_RUNTIME_DIR"], "friday.sock")
 
 class FridayClient:
-    def __init__(self):
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.connect(SOCKET_PATH)
-        self.stream = self.sock.makefile("rwb")
+    @contextmanager
+    def _connection(self):
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.connect(SOCKET_PATH)
+            with s.makefile("rwb") as stream:
+                yield stream
 
-    def send_json(self, response: Any):
-        self.stream.write((json.dumps(response) + "\n").encode())
-        self.stream.flush()
+    def _send_json(self, content: Any, stream: BinaryIO):
+        stream.write((json.dumps(content) + "\n").encode())
+        stream.flush()
+
+    def _get_response(self, stream: BinaryIO) -> dict:
+        line = stream.readline()
+        response = json.loads(line)
+
+        if err := response.get("error"):
+            raise Exception(err)
+
+        return response
 
     def ask(self, prompt: str):
-        request = {
-            "function": "ask",
-            "prompt": prompt
-        }
+        with self._connection() as stream:
+            self._send_json({ "function": "ask", "prompt": prompt }, stream)
 
-        self.send_json(request)
-        while True:
-            line = self.stream.readline()
-            response = json.loads(line)
+            while True:
+                response = self._get_response(stream)
 
-            if response.get("error"):
-                raise Exception(response["error"])
+                if response["type"] == "done":
+                    return
 
-            if response["type"] == "done":
-                return
+                yield response["type"], response["chunk"]
 
-            yield response["type"], response["chunk"]
-        
-    def transcribe(self, audio):
-        pass
+    def transcribe(self, audio) -> str:
+        shm = shared_memory.SharedMemory(create=True, size=audio.nbytes)
+        shared_audio = np.ndarray(audio.shape, dtype=audio.dtype, buffer=shm.buf)
+        shared_audio[:] = audio
+
+        with self._connection() as stream:
+            self._send_json({
+                "function": "transcribe",
+                "meta": {
+                    "name": shm.name,
+                    "shape": audio.shape,
+                    "dtype": audio.dtype.str,
+                },
+            }, stream)
+
+            try:
+                reply = self._get_response(stream).get("reply")
+            finally:
+                shm.close()
+                shm.unlink()
+
+            return reply
 
     def interrupt_speaking(self):
-        pass
+        with self._connection() as stream:
+            self._send_json({"function": "interrupt_speaking"}, stream)
+            self._get_response(stream)
 
     def say(self, text: str):
-        pass
+        with self._connection() as stream:
+            self._send_json({
+                "function": "say",
+                "text": text
+            }, stream)
+            
+            self._get_response(stream) 

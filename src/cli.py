@@ -11,7 +11,7 @@ try:
     from rich.live import Live
     from rich.markdown import Markdown
     HAS_RICH = True
-except (ImportError):
+except ImportError:
     HAS_RICH = False
 
 class CLI:
@@ -69,14 +69,11 @@ class CLI:
                 return
 
             if prompt == "/record":
-                chunks = []
-
-                with helpers.record_audio(
-                    callback=lambda indata, _, _1, _2: chunks.append(indata.copy())
-                ):
-                    input("Recording, press ENTER to stop")
-
-                prompt = self.fr.transcribe(chunks)
+                future, stop_recording = helpers.record_audio()
+                input("Recording, press ENTER to stop")
+                stop_recording()
+                audio = future.result()
+                prompt = self.fr.transcribe(audio)
                 print(f">> {prompt}")
             
             try:
@@ -84,6 +81,7 @@ class CLI:
                     self.__ask_rich(prompt)
                 else: 
                     self.__ask_no_rich(prompt)
+                    
             except (EOFError, KeyboardInterrupt):
                 self.fr.interrupt_speaking()
                 return
