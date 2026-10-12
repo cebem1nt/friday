@@ -1,16 +1,20 @@
-from piper import PiperVoice, SynthesisConfig
 from concurrent.futures import ThreadPoolExecutor, Future
 
 import numpy as np
 import sounddevice as sd
-import re, whisper, os, queue, threading
+import re, os, queue, threading
 
-from src import config
+from src import config, log
 
 class VoiceProvider:
     def __init__(self):
+        log.info("VoiceProvider: Setting up piper...")
+        from piper import PiperVoice, SynthesisConfig
         self.piper = PiperVoice.load(config.get("tts", "model_path", os.path.expanduser))
-        self.whisper = whisper.load_model(config.get("stt", "model"))
+        
+        log.info("VoiceProvider: Setting up whisper...")
+        from whisper import load_model
+        self.whisper = load_model(config.get("stt", "model"))
 
         self.syn_config = SynthesisConfig(
             length_scale=config.get("tts", "voice_scale", float)
@@ -25,11 +29,15 @@ class VoiceProvider:
         self._generation = 0
 
         self._stream_lock = threading.Lock()
+
+        log.info("VoiceProvider: Setting up sd.RawOutputStream...")
         self._output_stream = sd.RawOutputStream(
             samplerate=self.piper.config.sample_rate,
             channels=1,
             dtype="int16",
         )
+
+        log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
 
     def _synthesize(self, text: str, generation: int):
@@ -95,7 +103,7 @@ class VoiceProvider:
         if text:
             self._speech_executor.submit(self._synthesize, text, self._generation)
 
-    def interrupt_speaking(self):        
+    def interrupt_speaking(self):
         with self._buffer_lock:
             self._generation += 1
             self._speech_buffer = ""

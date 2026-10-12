@@ -1,7 +1,9 @@
-import ollama, os
+import os, ollama
 
-from src.voice import VoiceProvider
-from src import config, helpers, tools
+from src.friday.voice import VoiceProvider
+from src.friday import tools
+
+from src import config, helpers, log
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
@@ -10,37 +12,34 @@ from src import config, helpers, tools
 class Friday(VoiceProvider):
     max_tool_calls_rounds = 10
 
-    def __init__(
-        self, 
-        enable_web_search: bool = False
-    ):
+    def __init__(self):
         super().__init__()
-        self.model = config.get("ai", "model")
+        log.info("Friday: setting up Friday...")
 
-        self.tools = {}
+        self.model = config.get("ai", "model")
         self.messages = [{ 
             "role": "system", 
             "content": (
                 "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
                 "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
                 "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting at all! "
-                "You can ask questions if it helps to do what user wants or improves preciseness of your response"
+                "You can ask questions if it helps to do what user wants or improves preciseness of your response. "
                 f"Speak in english by default. Date today: {helpers.today()}"
             )
         }]
 
-        if enable_web_search:
+        self.tools = {}
+
+        if config.get("misc", "enable_web_search", bool):
             # TODO alternative search providers
 
+            log.info("Friday: checking OLLAMA_API_KEY...")
             if not os.getenv("OLLAMA_API_KEY"):
                 raise AssertionError("OLLAMA_API_KEY should be set in order to use web search")
 
             self.tools = { 
                 "web_search": tools.web_search, 
                 "web_fetch": tools.web_fetch, 
-                "run_application": tools.run_application,
-                "get_all_applications": tools.get_all_applications,
-                # "find_applications": tools.find_applications,
             }
 
             self.messages.append({

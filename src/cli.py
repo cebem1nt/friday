@@ -77,7 +77,7 @@ class CLI:
                 print(f">> {prompt}")
             
             try:
-                if HAS_RICH and config.get("misc", "rich_formatting"): 
+                if HAS_RICH and config.get("misc", "rich_formatting", bool): 
                     self.__ask_rich(prompt)
                 else: 
                     self.__ask_no_rich(prompt)
