@@ -103,7 +103,7 @@ class VoiceProvider:
         if text:
             self._speech_executor.submit(self._synthesize, text, self._generation)
 
-    def interrupt_speaking(self):
+    def shut_up(self):
         with self._buffer_lock:
             self._generation += 1
             self._speech_buffer = ""

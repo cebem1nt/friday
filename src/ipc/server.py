@@ -50,8 +50,8 @@ class FridayServer(socketserver.StreamRequestHandler):
             case "transcribe":
                 self.__transcribe(request["meta"])    
 
-            case "interrupt_speaking":
-                self.server.fr.interrupt_speaking()
+            case "shut_up":
+                self.server.fr.shut_up()
                 self._reply("ok")
 
             case "say":

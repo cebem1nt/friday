@@ -31,7 +31,10 @@ class FridayClient:
 
     def ask(self, prompt: str):
         with self._connection() as stream:
-            self._send_json({ "function": "ask", "prompt": prompt }, stream)
+            self._send_json({ 
+                "function": "ask", 
+                "prompt": prompt,
+            }, stream)
 
             while True:
                 response = self._get_response(stream)
@@ -64,9 +67,9 @@ class FridayClient:
 
             return reply
 
-    def interrupt_speaking(self):
+    def shut_up(self):
         with self._connection() as stream:
-            self._send_json({"function": "interrupt_speaking"}, stream)
+            self._send_json({"function": "shut_up"}, stream)
             self._get_response(stream)
 
     def say(self, text: str):

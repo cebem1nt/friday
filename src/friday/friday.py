@@ -47,7 +47,7 @@ class Friday(VoiceProvider):
                 "content": "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them."
             })
 
-    def __ask_stream(self, prompt: str):
+    def stream_reply(self, prompt: str):
         self.messages.append({ "role": "user", "content": prompt})
 
         for _ in range(self.max_tool_calls_rounds):
@@ -114,16 +114,13 @@ class Friday(VoiceProvider):
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def ask(self, prompt: str, aloud=True):
-        if aloud:
-            # Interrupts previous speaking 
-            self.interrupt_speaking()
+    def ask(self, prompt: str):
+        self.shut_up()
 
-        for message_type, message_chunk in self.__ask_stream(prompt):
-            if aloud and message_type == "response":
-                self.speak(message_chunk)
+        for chunk_t, chunk in self.stream_reply(prompt):
+            if chunk_t == "response":
+                self.speak(chunk)
             
-            yield message_type, message_chunk
+            yield chunk_t, chunk
         
-        if aloud:
-            self.done_speaking()
+        self.done_speaking()
