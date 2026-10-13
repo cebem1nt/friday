@@ -5,9 +5,9 @@ import argparse
 if __name__ == "__main__": 
     p = argparse.ArgumentParser()
 
-    p.add_argument("-s", "--serve",         action="store_true", help="run friday server")
-    p.add_argument("-c", "--chat",          action="store_true", help="open a CLI chat with friday")
-    p.add_argument("-r", "--toggle-record", action="store_true", help="start recording audio input recordng, when run once more - stop recording and send prompt transctiption to friday server")
+    p.add_argument("-s", "--serve",           action="store_true", help="run friday server")
+    p.add_argument("-c", "--chat",            action="store_true", help="open a CLI chat with friday")
+    p.add_argument("-l", "--listen-or-reply", action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
 
     args = p.parse_args()
 
@@ -15,11 +15,6 @@ if __name__ == "__main__":
         from src.ipc.server import friday_serve
         friday_serve()
         exit(0)
-
-
-    from time import perf_counter
-
-    started = perf_counter()
 
     from src.ipc.client import FridayClient
     from src.cli import CLI
@@ -30,8 +25,4 @@ if __name__ == "__main__":
     if args.chat:
         cli.chat()
     elif args.toggle_record:
-        elapsed = perf_counter() - started
-        print(f"Elapsed: {elapsed:.3f} seconds")
-        exit(1)
-
         cli.toggle_voice_prompt()

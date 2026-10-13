@@ -5,6 +5,37 @@ import sounddevice as sd
 import re, os, queue, threading
 
 from src import config, log
+from typing import Callable
+
+def record_audio(
+    samplerate: int = 16000, 
+    channels: int = 1, 
+    dtype: str = "float32"
+) -> tuple[Future, Callable]:
+    chunks = []
+    stop_event = threading.Event()
+    future = Future()
+
+    def callback(indata, _frames, _time, _status):
+        chunks.append(indata.copy())
+
+    def record():
+        try:
+            with sd.InputStream(
+                samplerate=samplerate,
+                channels=channels,
+                dtype=dtype,
+                callback=callback,
+            ):
+                stop_event.wait()
+
+            audio = np.concatenate(chunks).flatten()
+            future.set_result(audio)
+        except Exception as exc:
+            future.set_exception(exc)
+
+    threading.Thread(target=record, daemon=True).start()
+    return future, stop_event.set
 
 class VoiceProvider:
     def __init__(self):
@@ -39,6 +70,10 @@ class VoiceProvider:
 
         log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
+
+        self._listen_lock = threading.Lock()
+        self._listen_future: Future | None = None
+        self._stop_recording: Callable | None = None
 
     def _synthesize(self, text: str, generation: int):
         for chunk in self.piper.synthesize(text, syn_config=self.syn_config):
@@ -114,3 +149,28 @@ class VoiceProvider:
     def transcribe(self, audio: np.ndarray):
         result = self.whisper.transcribe(audio, fp16=False)
         return result["text"].strip()
+
+    def is_listening(self):
+        return self._listen_future is not None and self._stop_recording is not None
+
+    def listen(self) -> None:
+        with self._listen_lock:
+            if self.is_listening():
+                raise RuntimeError("Already recording.")
+
+            self._listen_future, self._stop_recording = record_audio()
+
+    def done_listening(self) -> str:
+        with self._listen_lock:
+            if not self.is_listening():
+                raise RuntimeError("Not currently recording.")
+
+            future = self._listen_future
+            self._stop_recording()
+
+            try:
+                audio = future.result()
+                return self.transcribe(audio)
+            finally:
+                self._listen_future = None
+                self._stop_recording = None

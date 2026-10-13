@@ -1,8 +1,5 @@
 import socket, os, json
-import numpy as np
-
 from typing import Any, BinaryIO
-from multiprocessing import shared_memory
 from contextlib import contextmanager
 
 SOCKET_PATH = os.path.join(
@@ -29,10 +26,10 @@ class FridayClient:
 
         return response
 
-    def ask(self, prompt: str):
+    def reply(self, prompt: str):
         with self._connection() as stream:
             self._send_json({ 
-                "function": "ask", 
+                "function": "reply", 
                 "prompt": prompt,
             }, stream)
 
@@ -44,33 +41,34 @@ class FridayClient:
 
                 yield response["type"], response["chunk"]
 
-    def transcribe(self, audio) -> str:
-        shm = shared_memory.SharedMemory(create=True, size=audio.nbytes)
-        shared_audio = np.ndarray(audio.shape, dtype=audio.dtype, buffer=shm.buf)
-        shared_audio[:] = audio
-
+    def listen_or_reply(self):
         with self._connection() as stream:
             self._send_json({
-                "function": "transcribe",
-                "meta": {
-                    "name": shm.name,
-                    "shape": audio.shape,
-                    "dtype": audio.dtype.str,
-                },
+                "function": "listen_or_reply"
             }, stream)
 
-            try:
-                reply = self._get_response(stream).get("reply")
-            finally:
-                shm.close()
-                shm.unlink()
+            while True:
+                response = self._get_response(stream)
 
-            return reply
+                if response["type"] == "done":
+                    return
+
+                yield response["type"], response["chunk"]
+
+    def listen(self):
+        with self._connection() as stream:
+            self._send_json({"function": "listen"}, stream)
+            return self._get_response(stream)
+
+    def done_listening(self):
+        with self._connection() as stream:
+            self._send_json({"function": "done_listening"}, stream)
+            return self._get_response(stream).get("reply")
 
     def shut_up(self):
         with self._connection() as stream:
             self._send_json({"function": "shut_up"}, stream)
-            self._get_response(stream)
+            return self._get_response(stream)
 
     def say(self, text: str):
         with self._connection() as stream:
@@ -79,4 +77,4 @@ class FridayClient:
                 "text": text
             }, stream)
             
-            self._get_response(stream) 
+            return self._get_response(stream) 

@@ -2,7 +2,6 @@ import os, json, socketserver
 import numpy as np
 
 from typing import Any
-from multiprocessing import shared_memory
 
 from src import log
 
@@ -14,12 +13,11 @@ class FridayServer(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps(response) + "\n").encode())
         self.wfile.flush()
 
-    def _reply(self, reply: str):
-        self.wfile.write((json.dumps({"reply": reply}) + "\n").encode())
-        self.wfile.flush()
-
-    def __ask(self, prompt: str):
-        for msg_type, message_chunk in self.server.fr.ask(prompt):
+    def _send_reply(self, reply: str):
+        self._send_json({"reply": reply})
+    
+    def __reply(self, prompt: str):
+        for msg_type, message_chunk in self.server.fr.reply(prompt):
             self._send_json({
                 "type": msg_type,
                 "chunk": message_chunk,
@@ -27,36 +25,38 @@ class FridayServer(socketserver.StreamRequestHandler):
 
         self._send_json({"type": "done"})
 
-    def __transcribe(self, meta: dict):
-        shm = shared_memory.SharedMemory(name=meta["name"], create=False, track=False)
+    def __listen_or_reply(self):
+        for msg_type, message_chunk in self.server.fr.listen_or_reply():
+            self._send_json({
+                "type": msg_type,
+                "chunk": message_chunk,
+            })
 
-        try: 
-            audio = np.ndarray(
-                meta["shape"],
-                dtype=np.dtype(meta["dtype"]),
-                buffer=shm.buf,
-            )
-
-            text = self.server.fr.transcribe(audio)
-            self._reply(text)
-        finally:
-            shm.close()
+        self._send_json({"type": "done"})
 
     def __match_request(self, request: dict):
         match request["function"]:
-            case "ask":
-                self.__ask(request["prompt"])
+            case "reply":
+                self.__reply(request["prompt"])
 
-            case "transcribe":
-                self.__transcribe(request["meta"])    
+            case "listen":
+                self.server.fr.listen()
+                self._send_reply("ok")
+
+            case "listen_or_reply":
+                self.__listen_or_reply()
+
+            case "done_listening":
+                content = self.server.fr.done_listening()
+                self._send_reply(content)
 
             case "shut_up":
                 self.server.fr.shut_up()
-                self._reply("ok")
+                self._send_reply("ok")
 
             case "say":
                 self.server.fr.say(request["text"])
-                self._reply("ok")
+                self._send_reply("ok")
 
             case _:
                 return False

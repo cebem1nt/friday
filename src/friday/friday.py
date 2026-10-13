@@ -114,7 +114,7 @@ class Friday(VoiceProvider):
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def ask(self, prompt: str):
+    def reply(self, prompt: str):
         self.shut_up()
 
         for chunk_t, chunk in self.stream_reply(prompt):
@@ -124,3 +124,11 @@ class Friday(VoiceProvider):
             yield chunk_t, chunk
         
         self.done_speaking()
+
+    def listen_or_reply(self):
+        if self.is_listening():
+            prompt = self.done_listening()
+            yield from self.reply(prompt)
+        else:
+            self.listen()
+            return

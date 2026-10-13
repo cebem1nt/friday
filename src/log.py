@@ -12,10 +12,10 @@ def ok(msg: str):
     if LOG_LEVEL >= 2:
         print(f"[\x1B[0;32mOK\x1B[0m] {msg}")
 
-def warn():
+def warn(msg: str):
     if LOG_LEVEL >= 1:
         print(f"[\x1B[0;33mWARNING\x1B[0m] {msg}", flush=True)
 
-def error():
+def error(msg: str):
     if LOG_LEVEL >= 0:
         print(f"[\x1B[0;31mERROR\x1B[0m] {msg}", flush=True)
