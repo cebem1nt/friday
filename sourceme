@@ -1,0 +1,19 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+if [[ ! -d ".venv" ]]; then
+    echo "Create virtual envrionment first" >&2
+    exit 1
+fi
+
+# Fix faster whisper cuda support with cuda > 12.0
+
+site="$(.venv/bin/python -c 'import site; print(site.getsitepackages()[0])')"
+export LD_LIBRARY_PATH="$site/nvidia/cublas/lib:$site/nvidia/cudnn/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+if [[ -e ".env" ]]; then
+    source .env # you might put OLLAMA_API_KEY there
+fi
+
+source .venv/bin/activate

@@ -1,13 +1,18 @@
 import os, ollama
 
+from datetime import datetime
+
 from src.friday.voice import VoiceProvider
 from src.friday import tools
 
-from src import config, helpers, log
+from src import config, log
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
 # it will have a tool to search for some things in the history
+
+def today():
+    return datetime.today().strftime('%Y-%m-%d')
 
 class Friday(VoiceProvider):
     max_tool_calls_rounds = 10
@@ -24,7 +29,7 @@ class Friday(VoiceProvider):
                 "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
                 "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting at all! "
                 "You can ask questions if it helps to do what user wants or improves preciseness of your response. "
-                f"Speak in english by default. Date today: {helpers.today()}"
+                f"Speak in english by default. Date today: {today()}"
             )
         }]
 

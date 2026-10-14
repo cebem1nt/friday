@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 
 import numpy as np
 import sounddevice as sd
-import re, os, queue, threading
+import re, os, threading
 
 from src import config, log
 from typing import Callable
@@ -39,16 +39,31 @@ def record_audio(
 
 class VoiceProvider:
     def __init__(self):
-        log.info("VoiceProvider: Setting up piper...")
-        from piper import PiperVoice, SynthesisConfig
-        self.piper = PiperVoice.load(config.get("tts", "model_path", os.path.expanduser))
-        
-        log.info("VoiceProvider: Setting up whisper...")
-        from whisper import load_model
-        self.whisper = load_model(config.get("stt", "model"))
+        log.info("VoiceProvider: Setting up kokoro...")
+        from kokoro_onnx import Kokoro
+        from onnxruntime import get_available_providers
+        import sounddevice as sd
 
-        self.syn_config = SynthesisConfig(
-            length_scale=config.get("tts", "voice_scale", float)
+        log.info(
+            f"VoiceProvider: available onx providers - {get_available_providers()}")
+
+        self.kokoro = Kokoro(
+            model_path=config.get("tts", "model_path", os.path.expanduser),
+            voices_path=config.get("tts", "voices_path", os.path.expanduser)
+        )
+
+        for inp in self.kokoro.sess.get_inputs():
+            print(inp.name, inp.type, inp.shape)
+
+        self.voice = config.get("tts", "voice")
+
+        log.info("VoiceProvider: Setting up whisper...")
+        from faster_whisper import WhisperModel
+
+        self.whisper = WhisperModel(
+            config.get("stt", "model"),
+            device=config.get("stt", "device"),
+            compute_type="float32",
         )
 
         self._speech_buffer = ""
@@ -59,39 +74,44 @@ class VoiceProvider:
         # changes the generation, making old queued chunks invalid.
         self._generation = 0
 
-        self._stream_lock = threading.Lock()
-
         log.info("VoiceProvider: Setting up sd.RawOutputStream...")
         self._output_stream = sd.RawOutputStream(
-            samplerate=self.piper.config.sample_rate,
+            samplerate=24000,
             channels=1,
-            dtype="int16",
+            dtype="float32",
         )
 
         log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
-
+        
+        self._stream_lock = threading.Lock()
         self._listen_lock = threading.Lock()
         self._listen_future: Future | None = None
         self._stop_recording: Callable | None = None
 
     def _synthesize(self, text: str, generation: int):
-        for chunk in self.piper.synthesize(text, syn_config=self.syn_config):
-            if generation != self._generation:
-                return
+        samples, sample_rate = self.kokoro.create(
+            text,
+            voice=self.voice,
+            speed=1.0,
+            lang="en-us",
+        )
 
-            try:
-                with self._stream_lock:
-                    if generation != self._generation:
-                        return
+        if generation != self._generation:
+            return
 
-                    self._output_stream.write(chunk.audio_int16_bytes)
-
-            except sd.PortAudioError:
-                # An abort during write is expected when interrupting.
+        try:
+            with self._stream_lock:
                 if generation != self._generation:
                     return
-                raise
+
+                self._output_stream.write(samples.tobytes())
+
+        except sd.PortAudioError:
+            if generation != self._generation:
+                return
+                
+            raise
 
     def say(self, text: str) -> Future:
         """
@@ -112,7 +132,7 @@ class VoiceProvider:
         with self._buffer_lock:
             self._speech_buffer += text
 
-            while match := re.search(r"[.!?](?:\s|$)", self._speech_buffer):
+            while match := re.search(r"[.!?]\s+", self._speech_buffer):
                 sentence = self._speech_buffer[:match.end()].strip()
                 self._speech_buffer = self._speech_buffer[match.end():]
 
@@ -147,13 +167,13 @@ class VoiceProvider:
             pass
         
     def transcribe(self, audio: np.ndarray):
-        result = self.whisper.transcribe(audio, fp16=False)
-        return result["text"].strip()
+        segments, info = self.whisper.transcribe(audio)
+        return "".join(segment.text for segment in segments).strip()
 
     def is_listening(self):
         return self._listen_future is not None and self._stop_recording is not None
 
-    def listen(self) -> None:
+    def listen(self):
         with self._listen_lock:
             if self.is_listening():
                 raise RuntimeError("Already recording.")

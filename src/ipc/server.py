@@ -1,5 +1,4 @@
 import os, json, socketserver
-import numpy as np
 
 from typing import Any
 
@@ -74,7 +73,7 @@ class FridayServer(socketserver.StreamRequestHandler):
                     self._send_json({"error": "unknown request function"})
                 
             except Exception as exc:
-                log.error(str(exc.with_traceback))
+                log.error(str(exc))
                 self._send_json({"error": str(exc)})
 
 def friday_serve():
