@@ -1,15 +1,50 @@
-import os, ollama
+import os, ollama, random
 
 from datetime import datetime
+from typing import Iterable, Optional
 
 from src.friday.voice import VoiceProvider
 from src.friday import tools
-
 from src import config, log
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
 # it will have a tool to search for some things in the history
+
+def random_thinking_quote():
+    return random.choice([
+        "Processing your request",
+        "I gotta think on a response",
+        "Let my brain work a little",
+        "Let me think",
+        "Let me think about it",
+        "I should think about it",
+        "I'm thinking",
+        "Okay, let me think for a moment",
+        "Thinking",
+        "I have to think about it",
+        "Wait please, I gotta think",
+        "Give me a second to think",
+        "Let me put my thoughts together",
+        "Working through it",
+        "One moment while I think",
+        "Thinking it through",
+        "Let me mull that over",
+        "Gathering my thoughts",
+        "Hmm, let me think",
+        "Just a moment—I'm figuring it out",
+        "Let me work this out",
+        "Taking a moment to think",
+        "My gears are turning",
+        "Let's see... thinking",
+        "I'm piecing together an answer",
+        "Hold on, let me reason this out",
+        "Running that through my head",
+        "Give me a beat to think",
+        "I'm sorting through the details",
+        "Let me come up with a good answer",
+        "Hold on a second",
+    ])
 
 def today():
     return datetime.today().strftime('%Y-%m-%d')
@@ -60,8 +95,8 @@ class Friday(VoiceProvider):
                 model=self.model,
                 messages=self.messages,
                 tools=self.tools.values() if self.tools else None,
-                stream=True,
-                keep_alive=config.get("ai", "keep_alive")
+                keep_alive=config.get("ai", "keep_alive"),
+                stream=True
             )
 
             content = ""
@@ -119,21 +154,45 @@ class Friday(VoiceProvider):
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def reply(self, prompt: str):
+    def reply(self, prompt: str, stream: bool = True) -> Iterable[tuple[str, str]] | str:
         self.shut_up()
+        generation = self._generation
 
-        for chunk_t, chunk in self.stream_reply(prompt):
-            if chunk_t == "response":
-                self.speak(chunk)
-            
-            yield chunk_t, chunk
-        
-        self.done_speaking()
+        def generator():
+            is_thinking = False
+            output = ""
 
-    def listen_or_reply(self):
-        if self.is_listening():
-            prompt = self.done_listening()
-            yield from self.reply(prompt)
-        else:
+            for chunk_t, chunk in self.stream_reply(prompt):
+                if chunk_t == "thinking" and not is_thinking:
+                    self.say(random_thinking_quote())
+                    is_thinking = True
+
+                if chunk_t == "response":
+                    self.speak(chunk, generation)
+                    output += chunk
+
+                yield chunk_t, chunk
+
+            self.done_speaking()
+            return output
+
+        gen = generator()
+
+        if stream:
+            return gen
+
+        while True:
+            try:
+                next(gen)
+
+            except StopIteration as result:
+                return result.value
+
+    def converse(self, stream: bool = True) -> Iterable[tuple[str, str]] | Optional[str]:
+        if not self.is_listening():
+            self.shut_up()
             self.listen()
-            return
+            return None
+
+        prompt = self.done_listening()
+        return self.reply(prompt, stream)

@@ -52,9 +52,6 @@ class VoiceProvider:
             voices_path=config.get("tts", "voices_path", os.path.expanduser)
         )
 
-        for inp in self.kokoro.sess.get_inputs():
-            print(inp.name, inp.type, inp.shape)
-
         self.voice = config.get("tts", "voice")
 
         log.info("VoiceProvider: Setting up whisper...")
@@ -90,7 +87,7 @@ class VoiceProvider:
         self._stop_recording: Callable | None = None
 
     def _synthesize(self, text: str, generation: int):
-        samples, sample_rate = self.kokoro.create(
+        samples, _ = self.kokoro.create(
             text,
             voice=self.voice,
             speed=1.0,
@@ -113,15 +110,15 @@ class VoiceProvider:
                 
             raise
 
-    def say(self, text: str) -> Future:
+    def say(self, text: str):
         """
         Unbuffered -> gets text -> says it
         """
 
-        return self._speech_executor.submit(
+        self._speech_executor.submit(
             self._synthesize, text, self._generation)
 
-    def speak(self, text: str):
+    def speak(self, text: str, generation: int):
         """
         Buffered -> stores pieces and says as the whole sentence arrives
         needs done_speaking() when finished        
@@ -139,9 +136,11 @@ class VoiceProvider:
                 if sentence:
                     sentences.append(sentence)
 
-        generation = self._generation
-
         for sentence in sentences:
+            if self._generation != generation:
+                return
+
+            log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
             self._speech_executor.submit(
                 self._synthesize, sentence, generation
             )
@@ -157,21 +156,6 @@ class VoiceProvider:
 
         if text:
             self._speech_executor.submit(self._synthesize, text, self._generation)
-
-    def shut_up(self):
-        with self._buffer_lock:
-            self._generation += 1
-            self._speech_buffer = ""
-
-        with self._stream_lock:
-            pass
-        
-    def transcribe(self, audio: np.ndarray):
-        segments, info = self.whisper.transcribe(audio)
-        return "".join(segment.text for segment in segments).strip()
-
-    def is_listening(self):
-        return self._listen_future is not None and self._stop_recording is not None
 
     def listen(self):
         with self._listen_lock:
@@ -194,3 +178,19 @@ class VoiceProvider:
             finally:
                 self._listen_future = None
                 self._stop_recording = None
+
+    def shut_up(self):
+        with self._buffer_lock:
+            self._generation += 1
+            log.debug(f"shifted self._generation = {self._generation}")
+            self._speech_buffer = ""
+
+        with self._stream_lock:
+            pass
+        
+    def transcribe(self, audio: np.ndarray):
+        segments, info = self.whisper.transcribe(audio)
+        return "".join(segment.text for segment in segments).strip()
+
+    def is_listening(self):
+        return self._listen_future is not None and self._stop_recording is not None

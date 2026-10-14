@@ -1,8 +1,12 @@
-LOG_LEVEL = 3
+LOG_LEVEL = 4
 
 def set_log_level(lvl: int):
     global LOG_LEVEL
     LOG_LEVEL = lvl
+
+def debug(msg: str):
+    if LOG_LEVEL >= 4:
+        print(f"[\x1B[0;35mDEBUG\x1B[0m] {msg}")
 
 def info(msg: str):
     if LOG_LEVEL >= 3:

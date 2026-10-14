@@ -2,6 +2,11 @@
 
 cd "$(dirname "$0")"
 
+if ! ollama list >/dev/null 2>&1; then
+    echo "Ollama is not running" >&2
+    exit 1
+fi
+
 if [[ ! -d ".venv" ]]; then
     echo "Create virtual envrionment first" >&2
     exit 1
@@ -17,3 +22,4 @@ if [[ -e ".env" ]]; then
 fi
 
 source .venv/bin/activate
+./friday -s

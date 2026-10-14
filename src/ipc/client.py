@@ -27,54 +27,62 @@ class FridayClient:
         return response
 
     def reply(self, prompt: str):
-        with self._connection() as stream:
+        with self._connection() as con:
             self._send_json({ 
                 "function": "reply", 
                 "prompt": prompt,
-            }, stream)
+            }, con)
 
             while True:
-                response = self._get_response(stream)
+                response = self._get_response(con)
 
                 if response["type"] == "done":
                     return
 
                 yield response["type"], response["chunk"]
 
-    def listen_or_reply(self):
-        with self._connection() as stream:
-            self._send_json({
-                "function": "listen_or_reply"
-            }, stream)
+    def converse(self):
+        with self._connection() as con:
+            self._send_json({"function": "converse"}, con)
 
             while True:
-                response = self._get_response(stream)
+                response = self._get_response(con)
 
                 if response["type"] == "done":
                     return
 
                 yield response["type"], response["chunk"]
+
+    def converse_text(self):
+        with self._connection() as con:
+            self._send_json({"function": "converse_text"}, con)
+            return self._get_response(con)
+
+    def reply_text(self):
+        with self._connection() as con:
+            self._send_json({"function": "reply_text"}, con)
+            return self._get_response(con)
 
     def listen(self):
-        with self._connection() as stream:
-            self._send_json({"function": "listen"}, stream)
-            return self._get_response(stream)
+        with self._connection() as con:
+            self._send_json({"function": "listen"}, con)
+            return self._get_response(con)
 
     def done_listening(self):
-        with self._connection() as stream:
-            self._send_json({"function": "done_listening"}, stream)
-            return self._get_response(stream).get("reply")
+        with self._connection() as con:
+            self._send_json({"function": "done_listening"}, con)
+            return self._get_response(con).get("reply")
 
     def shut_up(self):
-        with self._connection() as stream:
-            self._send_json({"function": "shut_up"}, stream)
-            return self._get_response(stream)
+        with self._connection() as con:
+            self._send_json({"function": "shut_up"}, con)
+            return self._get_response(con)
 
     def say(self, text: str):
-        with self._connection() as stream:
+        with self._connection() as con:
             self._send_json({
                 "function": "say",
                 "text": text
-            }, stream)
+            }, con)
             
-            return self._get_response(stream) 
+            return self._get_response(con) 

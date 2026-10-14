@@ -16,43 +16,6 @@ try:
 except ImportError:
     USE_RICH = False
 
-def random_thinking_quote():
-    return random.choice([
-        "Processing your request",
-        "I gotta think on a response",
-        "Let my brain work a little",
-        "Let me think",
-        "Let me think about it",
-        "I should think about it",
-        "I'm thinking",
-        "Okay, let me think for a moment",
-        "Thinking",
-        "I have to think about it",
-        "Wait please, I gotta think",
-        "Give me a second to think",
-        "Let me put my thoughts together",
-        "Working through it",
-        "One moment while I think",
-        "Thinking it through",
-        "Let me mull that over",
-        "Gathering my thoughts",
-        "Hmm, let me think",
-        "Just a moment—I'm figuring it out",
-        "Let me work this out",
-        "Taking a moment to think",
-        "My gears are turning",
-        "Let's see… thinking",
-        "I'm piecing together an answer",
-        "Hold on, let me reason this out",
-        "Running that through my head",
-        "Give me a beat to think",
-        "I'm sorting through the details",
-        "Let me come up with a good answer",
-        "Hold on a second",
-        "Just a little, almost there!",
-    ])
-
-
 @contextmanager
 def no_stdin_echo():
     fd = sys.stdin.fileno()
@@ -75,19 +38,13 @@ class CLI:
         content = ""
         
         is_thinking = False
-        thinking_quote = ""
         i = 1
 
         with Live(Markdown(content), console=console, refresh_per_second=12) as live:
             for chunk_type, chunk in self.fr.reply(prompt):
                 if chunk_type == "thinking":
-                    if not is_thinking:
-                        thinking_quote = random_thinking_quote()
-                        self.fr.say(thinking_quote)
-                        is_thinking = True
-
-                    content = thinking_quote
-                    content += "." * i
+                    is_thinking = True
+                    content = "Thinking" + ('.' * i)
                     i = ((i + 1) % 4)
                 else:
                     if is_thinking:
@@ -103,9 +60,7 @@ class CLI:
 
         for chunk_type, chunk in self.fr.reply(prompt):
             if chunk_type == "thinking" and not is_thinking:
-                thinking_quote = random_thinking_quote()
-                self.fr.say(thinking_quote)
-                print(f"{thinking_quote}...")
+                print("Thinking...")
                 is_thinking = True
             else:
                 print(chunk, flush=True, end='')
@@ -134,13 +89,3 @@ class CLI:
             except (EOFError, KeyboardInterrupt):
                 self.fr.shut_up()
                 return
-
-    def toggle_voice_prompt(self):
-        is_thinking = False
-
-        for chunk_t, _, in self.fr.listen_or_reply():
-            if chunk_t == "thinking" and not is_thinking:
-                thinking_quote = random_thinking_quote()
-                self.fr.say(thinking_quote)
-                is_thinking = True
-    

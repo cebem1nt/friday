@@ -1,6 +1,5 @@
 import os, json, socketserver
-
-from typing import Any
+from typing import Any, Callable, Optional
 
 from src import log
 
@@ -12,50 +11,31 @@ class FridayServer(socketserver.StreamRequestHandler):
         self.wfile.write((json.dumps(response) + "\n").encode())
         self.wfile.flush()
 
-    def _send_reply(self, reply: str):
+    def _send(self, reply: Optional[str]):
+        if reply == None:
+            reply = "ok"
+
         self._send_json({"reply": reply})
     
-    def __reply(self, prompt: str):
-        for msg_type, message_chunk in self.server.fr.reply(prompt):
+    def _stream(self, fn: Callable, **kwargs):
+        for t, chunk in fn(**kwargs):
             self._send_json({
-                "type": msg_type,
-                "chunk": message_chunk,
+                "type": t,
+                "chunk": chunk,
             })
 
         self._send_json({"type": "done"})
 
-    def __listen_or_reply(self):
-        for msg_type, message_chunk in self.server.fr.listen_or_reply():
-            self._send_json({
-                "type": msg_type,
-                "chunk": message_chunk,
-            })
-
-        self._send_json({"type": "done"})
-
-    def __match_request(self, request: dict):
-        match request["function"]:
-            case "reply":
-                self.__reply(request["prompt"])
-
-            case "listen":
-                self.server.fr.listen()
-                self._send_reply("ok")
-
-            case "listen_or_reply":
-                self.__listen_or_reply()
-
-            case "done_listening":
-                content = self.server.fr.done_listening()
-                self._send_reply(content)
-
-            case "shut_up":
-                self.server.fr.shut_up()
-                self._send_reply("ok")
-
-            case "say":
-                self.server.fr.say(request["text"])
-                self._send_reply("ok")
+    def __match_request(self, r: dict):
+        match r["function"]:
+            case "converse":        self._stream(self.server.fr.converse)
+            case "reply":           self._stream(self.server.fr.reply, prompt=r["prompt"])
+            case "converse_text":   self._send(self.server.fr.converse(stream=False))
+            case "reply_text":      self._send(self.server.fr.reply(r["prompt"], stream=False))
+            case "shut_up":         self._send(self.server.fr.shut_up())
+            case "say":             self._send(self.server.fr.say(r["text"]))
+            case "listen":          self._send(self.server.fr.listen())
+            case "done_listening":  self._send(self.server.fr.done_listening())
 
             case _:
                 return False
@@ -73,8 +53,8 @@ class FridayServer(socketserver.StreamRequestHandler):
                     self._send_json({"error": "unknown request function"})
                 
             except Exception as exc:
-                log.error(str(exc))
-                self._send_json({"error": str(exc)})
+                self._send_json({"error": f"internal error: {exc}"})
+                raise exc
 
 def friday_serve():
     if os.path.exists(SOCKET_PATH):

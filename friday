@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 
-
 if __name__ == "__main__": 
     p = argparse.ArgumentParser()
 
-    p.add_argument("-s", "--serve",           action="store_true", help="run friday server")
-    p.add_argument("-c", "--chat",            action="store_true", help="open a CLI chat with friday")
-    p.add_argument("-l", "--listen-or-reply", action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
+    p.add_argument("-s", "--serve",    action="store_true", help="run friday server")
+    p.add_argument("-c", "--chat",     action="store_true", help="open a CLI chat with friday")
+    p.add_argument("-C", "--converse", action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
 
     args = p.parse_args()
 
@@ -17,12 +16,13 @@ if __name__ == "__main__":
         exit(0)
 
     from src.ipc.client import FridayClient
-    from src.cli import CLI
-
     client = FridayClient()
-    cli = CLI(client)
 
     if args.chat:
+        from src.cli import CLI
+
+        cli = CLI(client)
         cli.chat()
-    elif args.toggle_record:
-        cli.toggle_voice_prompt()
+
+    elif args.converse:
+        client.converse_text()
