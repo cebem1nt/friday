@@ -41,11 +41,7 @@ class VoiceProvider:
     def __init__(self):
         log.info("VoiceProvider: Setting up kokoro...")
         from kokoro_onnx import Kokoro
-        from onnxruntime import get_available_providers
         import sounddevice as sd
-
-        log.info(
-            f"VoiceProvider: available onx providers - {get_available_providers()}")
 
         self.kokoro = Kokoro(
             model_path=config.get("tts", "model_path", os.path.expanduser),
@@ -87,6 +83,9 @@ class VoiceProvider:
         self._stop_recording: Callable | None = None
 
     def _synthesize(self, text: str, generation: int):
+        if generation != self._generation:
+            return
+
         samples, _ = self.kokoro.create(
             text,
             voice=self.voice,
