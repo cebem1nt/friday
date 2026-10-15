@@ -32,9 +32,12 @@ def _populate_config():
 def get(group: str, opt: str, _type=str):
     if _config is None:
         _populate_config()
-
-    return _type(_config[group][opt])
     
+    try:
+        return _type(_config[group][opt])
+    except:
+        return None
+
 # Hell yeah, im going to make friday be able to modify itself at runtime
 def set(group: str, opt: str, value: Any):
     if _config is None:

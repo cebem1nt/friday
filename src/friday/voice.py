@@ -53,10 +53,13 @@ class VoiceProvider:
         log.info("VoiceProvider: Setting up whisper...")
         from faster_whisper import WhisperModel
 
+        whisper_device = config.get("stt", "device")
+        compute_type = "float16" if whisper_device == "cuda" else "int8"
+
         self.whisper = WhisperModel(
             config.get("stt", "model"),
-            device=config.get("stt", "device"),
-            compute_type="float32",
+            device=whisper_device,
+            compute_type=compute_type,
         )
 
         self._speech_buffer = ""
@@ -102,7 +105,7 @@ class VoiceProvider:
                     return
 
                 self._output_stream.write(samples.tobytes())
-
+                
         except sd.PortAudioError:
             if generation != self._generation:
                 return
@@ -128,7 +131,7 @@ class VoiceProvider:
         with self._buffer_lock:
             self._speech_buffer += text
 
-            while match := re.search(r"[.!?]\s+", self._speech_buffer):
+            while match := re.search(r"[.!?:]\s+", self._speech_buffer):
                 sentence = self._speech_buffer[:match.end()].strip()
                 self._speech_buffer = self._speech_buffer[match.end():]
 

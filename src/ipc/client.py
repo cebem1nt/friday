@@ -58,9 +58,9 @@ class FridayClient:
             self._send_json({"function": "converse_text"}, con)
             return self._get_response(con)
 
-    def reply_text(self):
+    def reply_text(self, prompt: str):
         with self._connection() as con:
-            self._send_json({"function": "reply_text"}, con)
+            self._send_json({"function": "reply_text", "prompt": prompt}, con)
             return self._get_response(con)
 
     def listen(self):

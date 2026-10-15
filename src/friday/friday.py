@@ -1,4 +1,5 @@
 import os, ollama, random
+from inspect import getmembers as igetmembers, isfunction as iisfunction
 
 from datetime import datetime
 from typing import Iterable, Optional
@@ -78,8 +79,9 @@ class Friday(VoiceProvider):
                 raise AssertionError("OLLAMA_API_KEY should be set in order to use web search")
 
             self.tools = { 
-                "web_search": tools.web_search, 
-                "web_fetch": tools.web_fetch, 
+                name: func
+                for name, func in igetmembers(tools, iisfunction)
+                    if not name.startswith("__")
             }
 
             self.messages.append({
@@ -89,6 +91,7 @@ class Friday(VoiceProvider):
 
     def stream_reply(self, prompt: str):
         self.messages.append({ "role": "user", "content": prompt})
+        log.debug(f"stream_reply: got user message -> {prompt}")
 
         for _ in range(self.max_tool_calls_rounds):
             stream = ollama.chat(
@@ -133,6 +136,7 @@ class Friday(VoiceProvider):
                 }
             } for call in tool_calls]
 
+            log.debug(f"stream_reply: tool_call -> {message}")
             self.messages.append(message)
 
             for call in tool_calls:
@@ -145,11 +149,20 @@ class Friday(VoiceProvider):
                 else:
                     result = function(**arguments)
 
-                self.messages.append({
+                log.debug(f"tool response -> {result}")
+                message = {
                     "role": "tool",
                     "tool_name": name,
-                    "content": str(result),
-                })
+                    "content": result["content"]
+                }
+
+                if imgs := result.get("images"):
+                    message["images"] = imgs
+
+                if imgs := result.get("audio"):
+                    message["audio"] = audio
+
+                self.messages.append(message)
 
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"

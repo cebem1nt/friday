@@ -1,4 +1,4 @@
-import os, json, socketserver
+import os, json, socketserver, sys, socket
 from typing import Any, Callable, Optional
 
 from src import log
@@ -56,9 +56,24 @@ class FridayServer(socketserver.StreamRequestHandler):
                 self._send_json({"error": f"internal error: {exc}"})
                 raise exc
 
+def friday_server_is_running():
+    if not os.path.exists(SOCKET_PATH):
+        return False
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+        try:
+            probe.connect(SOCKET_PATH)
+            return True
+        except:
+            if os.path.exists(SOCKET_PATH):
+                os.unlink(SOCKET_PATH)
+            return False
+
+
 def friday_serve():
-    if os.path.exists(SOCKET_PATH):
-        os.unlink(SOCKET_PATH)
+    if friday_server_is_running():
+        print("Friday server is allready running!", file=sys.stderr)
+        exit(1)        
 
     with socketserver.ThreadingUnixStreamServer(SOCKET_PATH, FridayServer) as server:
         os.chmod(SOCKET_PATH, 0o600)

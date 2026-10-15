@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd "$(dirname "$0")"
+cd -- "$(dirname -- "$(realpath -- "$0")")"
 
 if ! ollama list >/dev/null 2>&1; then
     echo "Ollama is not running" >&2
