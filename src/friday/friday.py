@@ -59,11 +59,12 @@ class Friday(Voice, History):
         self.model_info = ollama.show(self.model)
 
         arch = self.model_info.modelinfo.get("general.architecture")
+        capabilities = self.model_info.capabilities
+
         required_context_length = config.get("ai", "num_ctx")
 
         if required_context_length == "unlimited":
-            max_context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
-            context_length = max_context_length
+            context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
         else:
             context_length = int(required_context_length)
 
@@ -71,6 +72,12 @@ class Friday(Voice, History):
         History.__init__(self, context_length)
 
         log.info("Friday: setting up Friday...")
+
+        self.think = config.get("ai", "think", bool)
+
+        if not "think" in capabilities:
+            log.info("Thinking is not supported by model")
+            self.think = None
 
         self.add_system_prompt((
             "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
@@ -82,21 +89,31 @@ class Friday(Voice, History):
 
         self.tools = {}
 
-        if config.get("misc", "enable_web_search", bool):
-            # TODO alternative search providers
-
-            log.info("Friday: checking OLLAMA_API_KEY...")
-            if not os.getenv("OLLAMA_API_KEY"):
-                raise AssertionError("OLLAMA_API_KEY should be set in order to use web search")
-
+        if config.get("ai", "use_tools", bool) and "tools" in capabilities:
             self.tools = { 
                 name: func
                 for name, func in igetmembers(tools, iisfunction)
                     if not name.startswith("__")
             }
 
-            self.add_system_prompt(
-                "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.")
+            if not config.get("misc", "enable_web_search", bool):
+                self.tools.pop("web_search")
+                self.tools.pop("web_fetch")
+            else:
+                # TODO alternative search providers
+
+                log.info("Friday: Web search is enabled")
+                log.info("Friday: checking OLLAMA_API_KEY...")
+
+                if not os.getenv("OLLAMA_API_KEY"):
+                    raise AssertionError("OLLAMA_API_KEY should be set in order to use web search")
+
+                self.add_system_prompt(
+                    "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.")
+                    
+        elif not "tools" in capabilities:
+            log.warn("Tools aren't supported by the model")
+
 
     def __stream_reply(
         self, 
@@ -148,9 +165,7 @@ class Friday(Voice, History):
                     yield "thinking", msg.thinking
 
             if not tool_calls:
-                self.add_message(full_reply, role="assistant")
-                self.finish_turn()
-                self.prune()
+                self.add_message(full_reply, role="assistant", finish_turn=True)
                 return full_reply
             
             self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
@@ -177,9 +192,7 @@ class Friday(Voice, History):
                     tool_name=name
                 )
 
-        self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant")
-        self.finish_turn()
-        self.prune()
+        self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant", finish_turn=True)
         yield "system", "Stopped, tool-call limit was hit"
 
     def reply(

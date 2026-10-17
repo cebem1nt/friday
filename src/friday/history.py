@@ -57,11 +57,6 @@ class History:
         self._turns: list[Turn] = []
         self._current_turn: Optional[Turn] = None
 
-        # Latest observed usage. prompt_eval_count excludes generated output.
-        self._last_context_tokens: Optional[int] = None
-
-        self._archive: list[dict] = []
-
     @property
     def messages(self):
         out = list(self._system_prompts)
@@ -83,6 +78,7 @@ class History:
         role: str = "user",
         images: Optional[list[str]] = None,
         audio: Optional[list[str]] = None,
+        finish_turn: bool = False,
         **extra
     ):
         if role == "user":
@@ -108,18 +104,9 @@ class History:
 
         self._current_turn.messages.append(message)
 
-    def finish_turn(self) -> None:
-        if self._current_turn is None:
-            return
-
-        self._current_turn.tokens = estimate_tokens(self._current_turn.messages)
-        self._current_turn.is_completed = True
-        self._current_turn = None
-
-    def _archive_turn(self, turn: Turn):
-        for message in turn.messages:
-            if should_archive(message):
-                pass # TODO archive old messages / turns to sql
+        if finish_turn:
+            self.finish_turn()
+            self.prune()
 
     def prune(self):
         completed_count = len(self._turns)
@@ -142,3 +129,27 @@ class History:
             removable_count -= 1
 
             log.info(f"History: pruned oldest turn ≈ -{oldest.tokens} tokens")
+
+    def finish_turn(self):
+        if self._current_turn is None:
+            return
+
+        self._current_turn.tokens = estimate_tokens(self._current_turn.messages)
+        self._current_turn.is_completed = True
+        self._current_turn = None
+
+    def _archive_turn(self, turn: Turn):
+        for message in turn.messages:
+            if should_archive(message):
+                pass # TODO archive old messages / turns to sql
+
+    def wipe_turns(self, archive: bool = False):
+        log.info("Wiping current turns history")
+
+        if archive:
+            log.info("Archiving...")
+            for turn in self._turns:
+                self._archive_turn(turn)
+        
+        self._turns = []
+        self._current_turn = None

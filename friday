@@ -4,10 +4,12 @@ import argparse
 if __name__ == "__main__": 
     p = argparse.ArgumentParser()
 
-    p.add_argument("-a", "--ask",      help="ask friday given content")
     p.add_argument("-s", "--serve",    action="store_true", help="run friday server")
+    p.add_argument("-a", "--ask",      help="ask friday given content")
     p.add_argument("-c", "--chat",     action="store_true", help="open a CLI chat with friday")
     p.add_argument("-C", "--converse", action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
+    p.add_argument("-w", "--wipe",     action="store_true", help="wipe current messages history, won't archive messages to database by default")
+    p.add_argument("-A", "--archive",  action="store_true", help="used only with --wipe: also archive current messages to the database")
 
     args = p.parse_args()
 
@@ -29,3 +31,5 @@ if __name__ == "__main__":
         client.converse_text()
     elif args.ask:
         print(client.reply_text(args.ask)["reply"])
+    elif args.wipe:
+        print(client.wipe_history(args.archive))

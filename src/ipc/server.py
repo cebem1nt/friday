@@ -36,6 +36,7 @@ class FridayServer(socketserver.StreamRequestHandler):
             case "say":             self._send(self.server.fr.say(r["text"]))
             case "listen":          self._send(self.server.fr.listen())
             case "done_listening":  self._send(self.server.fr.done_listening())
+            case "wipe_history":    self._send(self.server.fr.wipe_turns(r["archive"]))
 
             case _:
                 return False

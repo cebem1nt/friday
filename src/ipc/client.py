@@ -92,3 +92,8 @@ class FridayClient:
             }, con)
             
             return self._get_response(con) 
+
+    def wipe_history(self, archive: bool = False):
+        with self._connection() as con:
+            self._send_json({"function": "wipe_history", "archive": archive }, con)
+            return self._get_response(con)
