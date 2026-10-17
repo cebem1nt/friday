@@ -1,5 +1,5 @@
-from typing import Optional
 from dataclasses import dataclass, field
+from typing import Optional
 
 from src import log
 
@@ -14,22 +14,53 @@ def should_archive(message: dict):
 
     return True
 
+def estimate_tokens(messages: list[dict]):
+    text = 0
+    media = 0
+
+    for message in messages:
+        text += len(str(message.get("content", "")))
+
+        if tool_calls := message.get("tool_calls"):
+            text += len(str(tool_calls))
+
+        media += 768 * len(message.get("images", []))
+        media += 1000 * len(message.get("audio", []))
+
+    return text // 4 + media
+
+
 @dataclass
 class Turn:
     messages: list[dict] = field(default_factory=list)
+    tokens: Optional[int] = None
     is_completed: bool = False
 
 class History:
-    def __init__(self, context_total: int, context_reserve: int = 1500, keep_recent_turns: int = 3):
+    def __init__(
+        self,
+        context_total: int,
+        context_reserve: int = 1000,
+        keep_recent_turns: int = 3,
+    ):
+        if keep_recent_turns < 0:
+            raise ValueError("keep_recent_turns must be >= 0")
+
         self.context_total = context_total
         self.context_reserve = context_reserve
+        self.context_used = 0
+        self.context_target = self.context_total - self.context_reserve
+
         self.keep_recent_turns = keep_recent_turns
 
-        self._system_prompts = []
-        self._turns = [] 
-        self._current_turn = None
+        self._system_prompts: list[dict] = []
+        self._turns: list[Turn] = []
+        self._current_turn: Optional[Turn] = None
 
-        # self._messages = []
+        # Latest observed usage. prompt_eval_count excludes generated output.
+        self._last_context_tokens: Optional[int] = None
+
+        self._archive: list[dict] = []
 
     @property
     def messages(self):
@@ -49,7 +80,7 @@ class History:
     def add_message(
         self,
         content: str,
-        role="user",
+        role: str = "user",
         images: Optional[list[str]] = None,
         audio: Optional[list[str]] = None,
         **extra
@@ -61,7 +92,7 @@ class History:
             self._current_turn = Turn()
             self._turns.append(self._current_turn)
 
-        if self._current_turn is None or self._current_turn.is_completed:
+        if self._current_turn is None:
             raise RuntimeError("Add a user message to start a turn.")
 
         message = {
@@ -77,30 +108,37 @@ class History:
 
         self._current_turn.messages.append(message)
 
-    def finish_turn(self):
-        if self._current_turn is not None:
-            self._current_turn.is_completed = True
-            self._current_turn = None
+    def finish_turn(self) -> None:
+        if self._current_turn is None:
+            return
+
+        self._current_turn.tokens = estimate_tokens(self._current_turn.messages)
+        self._current_turn.is_completed = True
+        self._current_turn = None
+
+    def _archive_turn(self, turn: Turn):
+        for message in turn.messages:
+            if should_archive(message):
+                pass # TODO archive old messages / turns to sql
 
     def prune(self):
-        target_tokens = max(0, self.context_total - self.context_reserve)
+        completed_count = len(self._turns)
 
-        while estimate_tokens(self.messages) > target_tokens:
-            eligible_turns = self._turns[:-self.keep_recent_turns]
-            
-            if not eligible_turns:
-                break
+        if self._current_turn is not None:
+            completed_count -= 1
+        
+        removable_count = max(0, completed_count - self.keep_recent_turns)
 
-            oldest = eligible_turns[0]
+        while self.context_used > self.context_target and removable_count:
+            oldest = self._turns[0]
 
             if not oldest.is_completed:
                 break
 
-            for message in oldest.messages:
-                log.info(f"History: displacing message -> {message}")
+            self._archive_turn(oldest)
+            self._turns.pop(0)
 
-                if should_archive(message):
-                    log.info(f"History: archiving message")
-                    pass # TODO create sql archiving
+            self.context_used = max(0, self.context_used - oldest.tokens)
+            removable_count -= 1
 
-            self._turns.remove(oldest)
+            log.info(f"History: pruned oldest turn ≈ -{oldest.tokens} tokens")

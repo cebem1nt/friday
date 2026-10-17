@@ -75,17 +75,24 @@ class Voice:
         log.info("VoiceProvider: Setting up whisper...")
         from faster_whisper import WhisperModel
 
-        whisper_device = config.get("stt", "device")
-        compute_type = "float16" if whisper_device == "cuda" else "int8"
+        device = "auto"
+        if config.get("stt", "prefer_cpu", bool):
+            device = "cpu"
+
+        compute_type = "int8" if device == "cpu" else "float16" 
 
         self.whisper = WhisperModel(
             config.get("stt", "model"),
-            device=whisper_device,
+            device=device,
             compute_type=compute_type,
         )
 
     def __init_kokoro(self):
         log.info("VoiceProvider: Setting up kokoro...")
+
+        if config.get("tts", "prefer_cpu", bool):
+            os.environ["ONNX_PROVIDER"] = "CPUExecutionProvider"
+
         from kokoro_onnx import Kokoro
 
         self.kokoro = Kokoro(

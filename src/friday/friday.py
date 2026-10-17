@@ -106,7 +106,9 @@ class Friday(Voice, History):
     ):
         self.add_message(prompt, images=images, audio=audio)
         self.prune()
+        
         log.debug(f"stream_reply: got user message -> {prompt}")
+        log.debug(f"context used: {self.context_used}/{self.context_total}")
 
         for _ in range(self.max_tool_calls_rounds):
             self.prune()
@@ -125,6 +127,9 @@ class Friday(Voice, History):
 
             for chunk in stream:
                 msg = chunk.message
+
+                if chunk.done:
+                    self.context_used = chunk.prompt_eval_count + chunk.eval_count
 
                 if msg.content:
                     full_reply += msg.content
@@ -191,7 +196,6 @@ class Friday(Voice, History):
             is_thinking = False
             output = ""
 
-            log.debug(f"context: {self.context_used}/{self.context_total}")
             for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
                 if chunk_t == "thinking" and not is_thinking:
                     self.say(random_thinking_quote())
