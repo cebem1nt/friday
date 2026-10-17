@@ -28,4 +28,4 @@ if __name__ == "__main__":
     elif args.converse:
         client.converse_text()
     elif args.ask:
-        print(client.reply_text(args.ask))
+        print(client.reply_text(args.ask)["reply"])

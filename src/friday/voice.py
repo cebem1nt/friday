@@ -37,7 +37,7 @@ def record_audio(
     threading.Thread(target=record, daemon=True).start()
     return future, stop_event.set
 
-class VoiceProvider:
+class Voice:
     def __init__(self):
         log.info("VoiceProvider: Setting up kokoro...")
         from kokoro_onnx import Kokoro

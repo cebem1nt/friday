@@ -34,6 +34,14 @@ def get(group: str, opt: str, _type=str):
         _populate_config()
     
     try:
+        value = _config[group][opt]
+        if _type == bool:
+            value = value.strip().lower()
+            
+            if value == "true":
+                return True
+            return False
+
         return _type(_config[group][opt])
     except:
         return None

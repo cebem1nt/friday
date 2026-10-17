@@ -4,13 +4,10 @@ from inspect import getmembers as igetmembers, isfunction as iisfunction
 from datetime import datetime
 from typing import Iterable, Optional
 
-from src.friday.voice import VoiceProvider
+from src.friday.voice import Voice
+from src.friday.history import History
 from src.friday import tools
 from src import config, log
-
-# TODO we need a more smart message history
-# It's going to be a single chat model, i want an sqllite db storing all time conversations
-# it will have a tool to search for some things in the history
 
 def random_thinking_quote():
     return random.choice([
@@ -50,24 +47,35 @@ def random_thinking_quote():
 def today():
     return datetime.today().strftime('%Y-%m-%d')
 
-class Friday(VoiceProvider):
+# TODO we need a more smart message history
+# It's going to be a single chat model, i want an sqllite db storing all time conversations
+# it will have a tool to search for some things in the history
+
+class Friday(Voice, History):
     max_tool_calls_rounds = 10
 
     def __init__(self):
-        super().__init__()
+        self.model = config.get("ai", "model")
+        self.model_info = ollama.show(self.model)
+        
+        arch = self.model_info.modelinfo.get("general.architecture")
+        context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
+
+        Voice.__init__(self)
+        History.__init__(self, context_length)
+
         log.info("Friday: setting up Friday...")
 
-        self.model = config.get("ai", "model")
-        self.messages = [{ 
-            "role": "system", 
-            "content": (
+        self.add_message( 
+            role="system", 
+            content=(
                 "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
                 "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
-                "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting at all! "
-                "You can ask questions if it helps to do what user wants or improves preciseness of your response. "
+                "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
+                "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
                 f"Speak in english by default. Date today: {today()}"
             )
-        }]
+        )
 
         self.tools = {}
 
@@ -84,13 +92,15 @@ class Friday(VoiceProvider):
                     if not name.startswith("__")
             }
 
-            self.messages.append({
-                "role": "system",
-                "content": "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them."
-            })
+            self.add_message("Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.", role="system")
 
-    def stream_reply(self, prompt: str):
-        self.messages.append({ "role": "user", "content": prompt})
+    def __stream_reply(
+        self, 
+        prompt: str,
+        images: Optional[list[str]] = None, 
+        audio: Optional[list[str]] = None
+    ):
+        self.add_message(prompt, images=images, audio=audio)
         log.debug(f"stream_reply: got user message -> {prompt}")
 
         for _ in range(self.max_tool_calls_rounds):
@@ -102,47 +112,43 @@ class Friday(VoiceProvider):
                 stream=True
             )
 
-            content = ""
+            full_reply = ""
             tool_calls = []
 
             for chunk in stream:
-                message = chunk.message
+                if chunk.done:
+                    self.tokens_used = chunk.prompt_eval_count + chunk.eval_count
 
-                if message.content:
-                    content += message.content
-                    yield "response", message.content
+                msg = chunk.message
 
-                if message.tool_calls:
-                    yield "system", f"Using tool(s): {message.tool_calls}\n"
-                    tool_calls.extend(message.tool_calls)
+                if msg.content:
+                    full_reply += msg.content
+                    yield "response", msg.content
 
-                if message.thinking:
-                    yield "thinking", message.thinking
+                if msg.tool_calls:
+                    yield "system", f"Using tool(s): {msg.tool_calls}\n"
+                    tool_calls.extend([{
+                        "function": {
+                            "name": call.function.name,
+                            "arguments": call.function.arguments
+                        }
+                    } for call in msg.tool_calls])
 
-            message = {
-                "role": "assistant",
-                "content": content,
-            }
+                if msg.thinking:
+                    yield "thinking", msg.thinking
 
             if not tool_calls:
-                self.messages.append(message)
-                yield "response", '\n'
-                return
+                self.add_message(full_reply, role="assistant")
+                return full_reply
             
-            message["tool_calls"] = [{
-                "function": {
-                    "name": call.function.name,
-                    "arguments": call.function.arguments,
-                }
-            } for call in tool_calls]
-
-            log.debug(f"stream_reply: tool_call -> {message}")
-            self.messages.append(message)
+            self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
 
             for call in tool_calls:
-                name = call.function.name
+                log.debug(f"stream_reply: tool_call -> {call}")
+
+                name = call["function"]["name"]
+                arguments = call["function"]["arguments"]
                 function = self.tools.get(name)
-                arguments = call.function.arguments
 
                 if function is None:
                     result = f"Unknown tool: {name}"
@@ -150,24 +156,25 @@ class Friday(VoiceProvider):
                     result = function(**arguments)
 
                 log.debug(f"tool response -> {result}")
-                message = {
-                    "role": "tool",
-                    "tool_name": name,
-                    "content": result["content"]
-                }
 
-                if imgs := result.get("images"):
-                    message["images"] = imgs
-
-                if imgs := result.get("audio"):
-                    message["audio"] = audio
-
-                self.messages.append(message)
+                self.add_message(
+                    result["content"], 
+                    role="tool", 
+                    images=result.get("images"),
+                    audio=result.get("audio"),
+                    tool_name=name
+                )
 
         # TODO no good
         yield "system", "Stopped, tool-call limit was hit\n"
 
-    def reply(self, prompt: str, stream: bool = True) -> Iterable[tuple[str, str]] | str:
+    def reply(
+        self, 
+        prompt: str, 
+        stream: bool = True,
+        images: Optional[list[str]] = None, 
+        audio: Optional[list[str]] = None
+    ) -> Iterable[tuple[str, str]] | str:
         self.shut_up()
         generation = self._generation
 
@@ -175,7 +182,7 @@ class Friday(VoiceProvider):
             is_thinking = False
             output = ""
 
-            for chunk_t, chunk in self.stream_reply(prompt):
+            for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
                 if chunk_t == "thinking" and not is_thinking:
                     self.say(random_thinking_quote())
                     is_thinking = True

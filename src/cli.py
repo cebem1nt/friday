@@ -64,6 +64,7 @@ class CLI:
                 is_thinking = True
             else:
                 print(chunk, flush=True, end='')
+        print()
 
     def chat(self):
         while True:
@@ -72,14 +73,24 @@ class CLI:
             except (EOFError, KeyboardInterrupt):
                 return
 
-            if prompt == "/quit":
-                return
+            if prompt.startswith("/"):
+                if prompt == "/help":
+                    print("/quit    -> quit chat")
+                    print("/record  -> record audio prompt")
+                    continue
+                
+                if prompt == "/quit":
+                    return
 
-            if prompt == "/record":
-                self.fr.listen()
-                input("Recording, press ENTER to stop")
-                prompt = self.fr.done_listening()
-                print(f">> {prompt}")
+                elif prompt == "/record":
+                    self.fr.listen()
+                    input("Recording, press ENTER to stop")
+                    prompt = self.fr.done_listening()
+                    print(f">> {prompt}")
+
+                else:
+                    print("Invalid command. Use /help to see available")
+                    continue
 
             try:
                 with no_stdin_echo():

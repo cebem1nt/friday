@@ -14,7 +14,7 @@ APP_TYPES = {
     "email_client": ("x-scheme-handler/mailto",),
 }
 
-def __run(args: list[str, ...]):
+def __run(args: list[str]):
     return subprocess.run(
         args,
         capture_output=True,
@@ -31,7 +31,7 @@ def __run_shell(cmd: str):
         shell=True
     )
 
-def __popen(args: list[str, ...]):
+def __popen(args: list[str]):
     subprocess.Popen(args)
 
 def __query_default(mime_types: tuple[str, ...]) -> Optional[str]:
@@ -54,8 +54,8 @@ def __clip_contents(result, limit = 8000):
 # Use to wrap tool responses
 def __(
     text: str, 
-    images: Optional[list[str, ...]] = None, 
-    audio: Optional[list[str, ...]] = None
+    images: Optional[list[str]] = None, 
+    audio: Optional[list[str]] = None
 ) -> dict:
     out = { "content": text }
     

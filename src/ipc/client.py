@@ -1,6 +1,7 @@
 import socket, os, json
-from typing import Any, BinaryIO
 from contextlib import contextmanager
+
+from typing import Any, BinaryIO, Optional
 
 SOCKET_PATH = os.path.join(
     os.environ["XDG_RUNTIME_DIR"], "friday.sock")
@@ -26,7 +27,12 @@ class FridayClient:
 
         return response
 
-    def reply(self, prompt: str):
+    def reply(
+        self, 
+        prompt: str,
+        images: Optional[list[str]] = None, 
+        audio: Optional[list[str]] = None
+    ):
         with self._connection() as con:
             self._send_json({ 
                 "function": "reply", 
