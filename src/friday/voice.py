@@ -38,30 +38,7 @@ def record_audio(
     return future, stop_event.set
 
 class Voice:
-    def __init__(self):
-        log.info("VoiceProvider: Setting up kokoro...")
-        from kokoro_onnx import Kokoro
-        import sounddevice as sd
-
-        self.kokoro = Kokoro(
-            model_path=config.get("tts", "model_path", os.path.expanduser),
-            voices_path=config.get("tts", "voices_path", os.path.expanduser)
-        )
-
-        self.voice = config.get("tts", "voice")
-
-        log.info("VoiceProvider: Setting up whisper...")
-        from faster_whisper import WhisperModel
-
-        whisper_device = config.get("stt", "device")
-        compute_type = "float16" if whisper_device == "cuda" else "int8"
-
-        self.whisper = WhisperModel(
-            config.get("stt", "model"),
-            device=whisper_device,
-            compute_type=compute_type,
-        )
-
+    def __init__(self):    
         self._speech_buffer = ""
         self._buffer_lock = threading.Lock()
         self._speech_executor = ThreadPoolExecutor(max_workers=1)
@@ -69,8 +46,17 @@ class Voice:
         # Audio chunks are tagged with a generation number. stop_speaking()
         # changes the generation, making old queued chunks invalid.
         self._generation = 0
+        self.kokoro = None
+        self.whisper = None
+
+        if config.get("tts", "pre_allocate", bool):
+            self.__init_kokoro()
+
+        if config.get("stt", "pre_allocate", bool):
+            self.__init_whisper()
 
         log.info("VoiceProvider: Setting up sd.RawOutputStream...")
+        import sounddevice as sd
         self._output_stream = sd.RawOutputStream(
             samplerate=24000,
             channels=1,
@@ -84,6 +70,30 @@ class Voice:
         self._listen_lock = threading.Lock()
         self._listen_future: Future | None = None
         self._stop_recording: Callable | None = None
+
+    def __init_whisper(self):
+        log.info("VoiceProvider: Setting up whisper...")
+        from faster_whisper import WhisperModel
+
+        whisper_device = config.get("stt", "device")
+        compute_type = "float16" if whisper_device == "cuda" else "int8"
+
+        self.whisper = WhisperModel(
+            config.get("stt", "model"),
+            device=whisper_device,
+            compute_type=compute_type,
+        )
+
+    def __init_kokoro(self):
+        log.info("VoiceProvider: Setting up kokoro...")
+        from kokoro_onnx import Kokoro
+
+        self.kokoro = Kokoro(
+            model_path=config.get("tts", "model_path", os.path.expanduser),
+            voices_path=config.get("tts", "voices_path", os.path.expanduser)
+        )
+
+        self.voice = config.get("tts", "voice")
 
     def _synthesize(self, text: str, generation: int):
         if generation != self._generation:
@@ -116,6 +126,8 @@ class Voice:
         """
         Unbuffered -> gets text -> says it
         """
+        if self.kokoro is None:
+            self.__init_kokoro()
 
         self._speech_executor.submit(
             self._synthesize, text, self._generation)
@@ -143,6 +155,10 @@ class Voice:
                 return
 
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
+
+            if self.kokoro is None:
+                self.__init_kokoro()
+
             self._speech_executor.submit(
                 self._synthesize, sentence, generation
             )
@@ -191,6 +207,9 @@ class Voice:
             pass
         
     def transcribe(self, audio: np.ndarray):
+        if self.whisper is None:
+            self.__init_whisper()
+
         segments, info = self.whisper.transcribe(audio)
         return "".join(segment.text for segment in segments).strip()
 

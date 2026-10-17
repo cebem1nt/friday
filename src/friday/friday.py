@@ -52,30 +52,33 @@ def today():
 # it will have a tool to search for some things in the history
 
 class Friday(Voice, History):
-    max_tool_calls_rounds = 10
+    max_tool_calls_rounds = 20
 
     def __init__(self):
         self.model = config.get("ai", "model")
         self.model_info = ollama.show(self.model)
-        
+
         arch = self.model_info.modelinfo.get("general.architecture")
-        context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
+        required_context_length = config.get("ai", "num_ctx")
+
+        if required_context_length == "unlimited":
+            max_context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
+            context_length = max_context_length
+        else:
+            context_length = int(required_context_length)
 
         Voice.__init__(self)
         History.__init__(self, context_length)
 
         log.info("Friday: setting up Friday...")
 
-        self.add_message( 
-            role="system", 
-            content=(
-                "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
-                "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
-                "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
-                "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
-                f"Speak in english by default. Date today: {today()}"
-            )
-        )
+        self.add_system_prompt((
+            "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
+            "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
+            "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
+            "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
+            f"Speak in english by default. Date today: {today()}"
+        ))
 
         self.tools = {}
 
@@ -92,7 +95,8 @@ class Friday(Voice, History):
                     if not name.startswith("__")
             }
 
-            self.add_message("Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.", role="system")
+            self.add_system_prompt(
+                "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.")
 
     def __stream_reply(
         self, 
@@ -101,24 +105,25 @@ class Friday(Voice, History):
         audio: Optional[list[str]] = None
     ):
         self.add_message(prompt, images=images, audio=audio)
+        self.prune()
         log.debug(f"stream_reply: got user message -> {prompt}")
 
         for _ in range(self.max_tool_calls_rounds):
+            self.prune()
+
             stream = ollama.chat(
+                stream=True,
                 model=self.model,
                 messages=self.messages,
                 tools=self.tools.values() if self.tools else None,
                 keep_alive=config.get("ai", "keep_alive"),
-                stream=True
+                options={"num_ctx": self.context_total}
             )
 
             full_reply = ""
             tool_calls = []
 
             for chunk in stream:
-                if chunk.done:
-                    self.tokens_used = chunk.prompt_eval_count + chunk.eval_count
-
                 msg = chunk.message
 
                 if msg.content:
@@ -139,6 +144,8 @@ class Friday(Voice, History):
 
             if not tool_calls:
                 self.add_message(full_reply, role="assistant")
+                self.finish_turn()
+                self.prune()
                 return full_reply
             
             self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
@@ -165,8 +172,10 @@ class Friday(Voice, History):
                     tool_name=name
                 )
 
-        # TODO no good
-        yield "system", "Stopped, tool-call limit was hit\n"
+        self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant")
+        self.finish_turn()
+        self.prune()
+        yield "system", "Stopped, tool-call limit was hit"
 
     def reply(
         self, 
@@ -182,6 +191,7 @@ class Friday(Voice, History):
             is_thinking = False
             output = ""
 
+            log.debug(f"context: {self.context_used}/{self.context_total}")
             for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
                 if chunk_t == "thinking" and not is_thinking:
                     self.say(random_thinking_quote())
