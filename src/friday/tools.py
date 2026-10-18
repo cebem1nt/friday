@@ -90,6 +90,8 @@ def web_fetch(url: str):
     """
     return __clip_contents(ollama.web_fetch(url))
 
+
+
 def open_browser():
     """
     Tries to just open user's web browser.

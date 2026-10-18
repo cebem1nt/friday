@@ -1,51 +1,13 @@
-import os, ollama, random
 from inspect import getmembers as igetmembers, isfunction as iisfunction
 
-from datetime import datetime
 from typing import Iterable, Optional
 
 from src.friday.voice import Voice
 from src.friday.history import History
-from src.friday import tools
+from src.friday import tools, common
 from src import config, log
 
-def random_thinking_quote():
-    return random.choice([
-        "Processing your request",
-        "I gotta think on a response",
-        "Let my brain work a little",
-        "Let me think",
-        "Let me think about it",
-        "I should think about it",
-        "I'm thinking",
-        "Okay, let me think for a moment",
-        "Thinking",
-        "I have to think about it",
-        "Wait please, I gotta think",
-        "Give me a second to think",
-        "Let me put my thoughts together",
-        "Working through it",
-        "One moment while I think",
-        "Thinking it through",
-        "Let me mull that over",
-        "Gathering my thoughts",
-        "Hmm, let me think",
-        "Just a moment—I'm figuring it out",
-        "Let me work this out",
-        "Taking a moment to think",
-        "My gears are turning",
-        "Let's see... thinking",
-        "I'm piecing together an answer",
-        "Hold on, let me reason this out",
-        "Running that through my head",
-        "Give me a beat to think",
-        "I'm sorting through the details",
-        "Let me come up with a good answer",
-        "Hold on a second",
-    ])
-
-def today():
-    return datetime.today().strftime('%Y-%m-%d')
+import os, ollama, re
 
 # TODO we need a more smart message history
 # It's going to be a single chat model, i want an sqllite db storing all time conversations
@@ -84,7 +46,7 @@ class Friday(Voice, History):
             "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
             "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
             "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
-            f"Speak in english by default. Date today: {today()}"
+            f"Speak in english by default. Date today: {common.today()}"
         ))
 
         self.tools = {}
@@ -110,7 +72,7 @@ class Friday(Voice, History):
 
                 self.add_system_prompt(
                     "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.")
-                    
+
         elif not "tools" in capabilities:
             log.warn("Tools aren't supported by the model")
 
@@ -142,55 +104,72 @@ class Friday(Voice, History):
             full_reply = ""
             tool_calls = []
 
-            for chunk in stream:
-                msg = chunk.message
+            try: 
+                for chunk in stream:
+                    msg = chunk.message
 
-                if chunk.done:
-                    self.context_used = chunk.prompt_eval_count + chunk.eval_count
+                    if chunk.done:
+                        self.context_used = chunk.prompt_eval_count + chunk.eval_count
 
-                if msg.content:
-                    full_reply += msg.content
-                    yield "response", msg.content
+                    if msg.content:
+                        full_reply += msg.content
+                        yield "response", msg.content
 
-                if msg.tool_calls:
-                    yield "system", f"Using tool(s): {msg.tool_calls}\n"
-                    tool_calls.extend([{
-                        "function": {
-                            "name": call.function.name,
-                            "arguments": call.function.arguments
-                        }
-                    } for call in msg.tool_calls])
+                    if msg.tool_calls:
+                        yield "system", f"Using tool(s): {msg.tool_calls}\n"
+                        tool_calls.extend([{
+                            "function": {
+                                "name": call.function.name,
+                                "arguments": call.function.arguments
+                            }
+                        } for call in msg.tool_calls])
 
-                if msg.thinking:
-                    yield "thinking", msg.thinking
+                    if msg.thinking:
+                        yield "thinking", msg.thinking
 
-            if not tool_calls:
-                self.add_message(full_reply, role="assistant", finish_turn=True)
-                return full_reply
-            
-            self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
+                if not tool_calls:
+                    self.add_message(full_reply, role="assistant", finish_turn=True)
+                    return full_reply
+                
+                self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
 
-            for call in tool_calls:
-                log.debug(f"stream_reply: tool_call -> {call}")
+                for call in tool_calls:
+                    log.debug(f"stream_reply: tool_call -> {call}")
 
-                name = call["function"]["name"]
-                arguments = call["function"]["arguments"]
-                function = self.tools.get(name)
+                    name = call["function"]["name"]
+                    arguments = call["function"]["arguments"]
+                    function = self.tools.get(name)
 
-                if function is None:
-                    result = f"Unknown tool: {name}"
-                else:
-                    result = function(**arguments)
+                    if function is None:
+                        result = f"Unknown tool: {name}"
+                    else:
+                        result = function(**arguments)
 
-                log.debug(f"tool response -> {result}")
+                    log.debug(f"tool response -> {result}")
 
-                self.add_message(
-                    result["content"], 
-                    role="tool", 
-                    images=result.get("images"),
-                    audio=result.get("audio"),
-                    tool_name=name
-                )
+                    self.add_message(
+                        result["content"], 
+                        role="tool", 
+                        images=result.get("images"),
+                        audio=result.get("audio"),
+                        tool_name=name
+                    )
+
+            except ollama.ResponseError as e:
+                # So, this is a big workaround, for our shitty rolling single chat aproach
+                # if ollama throws an error, sayn no "context size left", it looks like this: 
+                #   request (4161 tokens) exceeds the available context size (4096 tokens), try increasing it (status code: 400) 
+                # We aint afraid of that, we ball and parse it, update self.context_used with that and
+                # on the next iteration self.prune() will do it's thing
+
+                match = re.search(r"\((\d+)\s+tokens\)", e.error)
+
+                if e.status_code != 400 or not match:
+                    raise
+
+                log.debug("got ollama.ResponseError, tokens size exceeded, update self.context_used")
+                self.context_used = int(match.group(1))
+                continue
 
         self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant", finish_turn=True)
         yield "system", "Stopped, tool-call limit was hit"
@@ -211,7 +190,7 @@ class Friday(Voice, History):
 
             for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
                 if chunk_t == "thinking" and not is_thinking:
-                    self.say(random_thinking_quote())
+                    self.say(common.random_thinking_quote())
                     is_thinking = True
 
                 if chunk_t == "response":

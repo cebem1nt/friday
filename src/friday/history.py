@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src import log
+from src.friday.common import db
+from src import log, config
 
 def should_archive(message: dict):
     role = message["role"]
@@ -24,10 +25,10 @@ def estimate_tokens(messages: list[dict]):
         if tool_calls := message.get("tool_calls"):
             text += len(str(tool_calls))
 
-        media += 768 * len(message.get("images", []))
-        media += 1000 * len(message.get("audio", []))
+        media += 1100 * len(message.get("images", []))
+        media += 798 * len(message.get("audio", []))
 
-    return text // 4 + media
+    return text // 3 + media
 
 
 @dataclass
@@ -40,18 +41,16 @@ class History:
     def __init__(
         self,
         context_total: int,
-        context_reserve: int = 1000,
-        keep_recent_turns: int = 3,
     ):
         if keep_recent_turns < 0:
             raise ValueError("keep_recent_turns must be >= 0")
 
         self.context_total = context_total
-        self.context_reserve = context_reserve
+        self.context_reserve = config.get("misc", "context_reserve", int)
         self.context_used = 0
         self.context_target = self.context_total - self.context_reserve
 
-        self.keep_recent_turns = keep_recent_turns
+        self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
 
         self._system_prompts: list[dict] = []
         self._turns: list[Turn] = []
@@ -141,7 +140,8 @@ class History:
     def _archive_turn(self, turn: Turn):
         for message in turn.messages:
             if should_archive(message):
-                pass # TODO archive old messages / turns to sql
+                log.info(f"Archiving message: {message}")
+                db.add_message_entry(message["role"], message["content"])
 
     def wipe_turns(self, archive: bool = False):
         log.info("Wiping current turns history")
@@ -153,3 +153,10 @@ class History:
         
         self._turns = []
         self._current_turn = None
+
+    def unstage_turn(self):
+        if self._current_turn is None:
+            return
+
+        self._current_turn = None
+        self._turns.pop()
