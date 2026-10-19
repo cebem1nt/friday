@@ -28,7 +28,7 @@ def estimate_tokens(messages: list[dict]):
         media += 1100 * len(message.get("images", []))
         media += 798 * len(message.get("audio", []))
 
-    return text // 3 + media
+    return (text // 3) + media
 
 
 @dataclass
@@ -38,19 +38,16 @@ class Turn:
     is_completed: bool = False
 
 class History:
-    def __init__(
-        self,
-        context_total: int,
-    ):
-        if keep_recent_turns < 0:
-            raise ValueError("keep_recent_turns must be >= 0")
-
+    def __init__(self, context_total: int):
+        self.context_used = 0
         self.context_total = context_total
         self.context_reserve = config.get("misc", "context_reserve", int)
-        self.context_used = 0
         self.context_target = self.context_total - self.context_reserve
 
         self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
+        
+        if self.keep_recent_turns < 0:
+            raise ValueError("keep_recent_turns must be >= 0")
 
         self._system_prompts: list[dict] = []
         self._turns: list[Turn] = []
@@ -108,14 +105,14 @@ class History:
             self.prune()
 
     def prune(self):
-        completed_count = len(self._turns)
+        completed = len(self._turns)
 
         if self._current_turn is not None:
-            completed_count -= 1
+            completed -= 1
         
-        removable_count = max(0, completed_count - self.keep_recent_turns)
+        removable = max(0, completed - self.keep_recent_turns)
 
-        while self.context_used > self.context_target and removable_count:
+        while self.context_used > self.context_target and removable:
             oldest = self._turns[0]
 
             if not oldest.is_completed:
@@ -124,10 +121,11 @@ class History:
             self._archive_turn(oldest)
             self._turns.pop(0)
 
+            # This is an approximation
             self.context_used = max(0, self.context_used - oldest.tokens)
-            removable_count -= 1
+            removable -= 1
 
-            log.info(f"History: pruned oldest turn ≈ -{oldest.tokens} tokens")
+            log.info(f"History: pruned oldest turn ≈ {oldest.tokens} tokens")
 
     def finish_turn(self):
         if self._current_turn is None:

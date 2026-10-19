@@ -58,24 +58,21 @@ class Friday(Voice, History):
                     if not name.startswith("__")
             }
 
-            if not config.get("misc", "enable_web_search", bool):
+            if config.get("misc", "web_search_provider") == "none":
                 self.tools.pop("web_search")
                 self.tools.pop("web_fetch")
             else:
-                # TODO alternative search providers
-
                 log.info("Friday: Web search is enabled")
-                log.info("Friday: checking OLLAMA_API_KEY...")
 
-                if not os.getenv("OLLAMA_API_KEY"):
-                    raise AssertionError("OLLAMA_API_KEY should be set in order to use web search")
-
-                self.add_system_prompt(
-                    "Use web_search for current information and web_fetch to read a page when useful. Cite web-result URLs when you use them.")
+                self.add_system_prompt((
+                    "Use web_search to search the internet, use web_fetch to get page by **url**. "
+                    "Cite web-result URLs when you use them."
+                ))
+                
+            log.debug(f"tools: {self.tools}")
 
         elif not "tools" in capabilities:
             log.warn("Tools aren't supported by the model")
-
 
     def __stream_reply(
         self, 
@@ -87,7 +84,6 @@ class Friday(Voice, History):
         self.prune()
         
         log.debug(f"stream_reply: got user message -> {prompt}")
-        log.debug(f"context used: {self.context_used}/{self.context_total}")
 
         for _ in range(self.max_tool_calls_rounds):
             self.prune()
@@ -200,6 +196,7 @@ class Friday(Voice, History):
                 yield chunk_t, chunk
 
             self.done_speaking()
+            log.debug(f"context used: {self.context_used}/{self.context_total}")
             return output
 
         gen = generator()

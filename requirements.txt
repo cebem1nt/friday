@@ -1,6 +1,7 @@
 sounddevice
 faster-whisper
 ollama
+ddgs
 kokoro-onnx
 onnxruntime-gpu
 nvidia-cublas-cu12 

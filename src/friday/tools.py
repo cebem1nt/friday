@@ -1,7 +1,9 @@
 import ollama, subprocess, os, shutil
 
-from typing import Optional
+from typing import Optional, Any
 from src import config
+
+WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 
 APP_TYPES = {
     "browser":      ("x-scheme-handler/https", "x-scheme-handler/http"),
@@ -34,7 +36,9 @@ def __run_shell(cmd: str):
 def __popen(args: list[str]):
     subprocess.Popen(args)
 
-def __query_default(mime_types: tuple[str, ...]) -> Optional[str]:
+def __query_default(app: str) -> Optional[str]:
+    mime_types = APP_TYPES[app]
+
     for mime_type in mime_types:
         out =__run(["xdg-mime", "query", "default", mime_type])
         app_id = out.stdout.strip()
@@ -44,60 +48,96 @@ def __query_default(mime_types: tuple[str, ...]) -> Optional[str]:
     
     return None
 
-def __clip_contents(result, limit = 8000):
-    text = str(result)
-    if len(text) > limit:
-        return text[:limit] + "\n... [truncated]"
-
-    return text
-
 # Use to wrap tool responses
 def __(
-    text: str, 
+    content: Any, 
     images: Optional[list[str]] = None, 
     audio: Optional[list[str]] = None
 ) -> dict:
-    out = { "content": text }
+    out = { "content": str(content) }
     
     if images: out["images"] = images
     if audio:  out["audio"] = audio
 
     return out
 
-def web_search(query: str, max_results = 3):
-    """
-    Performs a web search
+if WEB_SEARCH_PROVIDER == "ddgs":
+    from ddgs import DDGS
 
-    Args:
-      query: The query to search for
-      max_results: The maximum number of results to return (default: 3)
+    def web_search(query: str, max_results: int = 3):
+        return __(DDGS().text(query, max_results=max_results))
 
-    Returns:
-      WebSearchResponse with the search results
-    """
-    result = ollama.web_search(query, max_results)
-    return __(__clip_contents(result))
+    def web_fetch(url: str):
+        """
+        Args:
+            url: url of the web page
+        """
+        return __(DDGS().extract(url))
 
-def web_fetch(url: str):
-    """
-    Fetches the content of a web page for the provided URL.
+elif WEB_SEARCH_PROVIDER == "ollama":
+    if not os.getenv("OLLAMA_API_KEY"):
+        raise AssertionError("OLLAMA_API_KEY should be set in order to use ollama web search")
 
-    Args:
-      url: The URL to fetch
+    def web_search(query: str, max_results: int = 2):
+        return __(ollama.web_search(query, max_results))
 
-    Returns:
-      WebFetchResponse with the fetched result
-    """
-    return __clip_contents(ollama.web_fetch(url))
+    def web_fetch(url: str):
+        """
+        Args:
+            url: url of the web page
+        """
+        return __(ollama.web_fetch(url))
 
+elif WEB_SEARCH_PROVIDER == "searxng":
+    import requests, trafilatura
 
+    def web_search(query: str, max_results: int = 2) -> dict:
+        max_results = max(1, min(max_results, 8))
+
+        response = requests.get(
+            config.get("misc", "searxng_url"),
+            params={"q": query, "format": "json"},
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        results = response.json().get("results", [])[:max_results]
+        found = [
+            {
+                "title": item.get("title", ""),
+                "body": item.get("content", "")[:700],
+                "url": item.get("url", ""),
+            }
+            for item in results
+        ]
+
+        return __(found)
+
+    def web_fetch(url: str):
+        """
+        Args:
+            url: url of the web page
+        """
+
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+
+        text = trafilatura.extract(
+            response.text,
+            url=url,
+            include_comments=False,
+            include_tables=True,
+        )
+
+        return __(text or "")
 
 def open_browser():
     """
     Tries to just open user's web browser.
     """
 
-    __popen(["gtk-launch", __query_default(APP_TYPES["browser"])])
+    __popen(["gtk-launch", __query_default("browser")])
     return __("Browser launched successfully!")
 
 def open_file_manager():
@@ -105,7 +145,7 @@ def open_file_manager():
     Tries to just open user's file manager
     """
 
-    __popen(["gtk-launch", __query_default(APP_TYPES["file_manager"])])
+    __popen(["gtk-launch", __query_default("file_manager")])
     return __("File manager launched successfully!")
 
 def get_content_from_clipboard():
@@ -157,14 +197,6 @@ def open_content(content: str):
         return __(f"Could not launch: {out.stderr.strip()}")
     
     return __(f"{content} was launched sucessfully!")
-
-
-def open_content_from_clipboard():
-    """
-    Use if user asked to open currently selected content, "this" file, "this" link, or just "this" or maybe "open it".
-    """
-
-    return open_content(get_content_from_clipboard()["content"])
 
 def read_content_from_selected_file():
     """

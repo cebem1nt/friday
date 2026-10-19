@@ -81,5 +81,5 @@ def friday_serve():
         log.info("Importing Friday, ollama...")
         from src.friday.friday import Friday
         server.fr = Friday()
-        log.ok(f"Ready on {SOCKET_PATH}")
+        log.info(f"Ready on {SOCKET_PATH}")
         server.serve_forever()
