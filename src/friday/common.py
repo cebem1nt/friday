@@ -73,13 +73,13 @@ class Database:
         with self.con() as con:
             con.execute("INSERT INTO message (role, content) VALUES (?, ?)", (role, content))
 
-    def query(self, sql: str, params=(), limit: int = 25):
+    def query(self, sql: str, limit: int = 25):
         if limit < 1:
             raise ValueError("limit must be at least 1")
 
         with self.con() as con:
             con.execute("PRAGMA query_only = ON")
-            cursor = con.execute(sql, params)
+            cursor = con.execute(sql)
 
             if cursor.description is None:
                 return []

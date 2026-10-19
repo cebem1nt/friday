@@ -82,4 +82,8 @@ def friday_serve():
         from src.friday.friday import Friday
         server.fr = Friday()
         log.info(f"Ready on {SOCKET_PATH}")
-        server.serve_forever()
+        
+        try:
+            server.serve_forever()
+        finally:
+            server.fr.wipe_turns(archive=True)

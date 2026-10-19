@@ -9,10 +9,6 @@ from src import config, log
 
 import os, ollama, re
 
-# TODO we need a more smart message history
-# It's going to be a single chat model, i want an sqllite db storing all time conversations
-# it will have a tool to search for some things in the history
-
 class Friday(Voice, History):
     max_tool_calls_rounds = 20
 
@@ -22,6 +18,7 @@ class Friday(Voice, History):
 
         arch = self.model_info.modelinfo.get("general.architecture")
         capabilities = self.model_info.capabilities
+        self.supports_tools = "tools" in capabilities
 
         required_context_length = config.get("ai", "num_ctx")
 
@@ -46,17 +43,33 @@ class Friday(Voice, History):
             "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
             "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
             "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
+            "You have a single chat messages history, messages that don't fit into your context window go to a database"
             f"Speak in english by default. Date today: {common.today()}"
         ))
 
         self.tools = {}
 
-        if config.get("ai", "use_tools", bool) and "tools" in capabilities:
+        if config.get("ai", "use_tools", bool) and self.supports_tools:
             self.tools = { 
                 name: func
                 for name, func in igetmembers(tools, iisfunction)
                     if not name.startswith("__")
             }
+
+            self.add_system_prompt((
+                "Use query_stored_messages to search for messages stored in the database."
+                "Pass an sql query to it, db has a single table named message: "
+                """
+                ```
+                message (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL
+                )
+                ```
+                """
+            ))
 
             if config.get("misc", "web_search_provider") == "none":
                 self.tools.pop("web_search")
@@ -71,7 +84,7 @@ class Friday(Voice, History):
                 
             log.debug(f"tools: {self.tools}")
 
-        elif not "tools" in capabilities:
+        elif self.supports_tools:
             log.warn("Tools aren't supported by the model")
 
     def __stream_reply(

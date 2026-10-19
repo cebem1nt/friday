@@ -1,6 +1,7 @@
 import ollama, subprocess, os, shutil
 
 from typing import Optional, Any
+from src.friday import common
 from src import config
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
@@ -132,29 +133,22 @@ elif WEB_SEARCH_PROVIDER == "searxng":
 
         return __(text or "")
 
-def open_browser():
+def query_stored_messages(sql: str):
     """
-    Tries to just open user's web browser.
+    Args:
+      sql to execute. Database has only "message" table
     """
+    return __(common.db.query(sql))
 
+def open_web_browser():
     __popen(["gtk-launch", __query_default("browser")])
-    return __("Browser launched successfully!")
+    return __("Web browser launched successfully!")
 
 def open_file_manager():
-    """
-    Tries to just open user's file manager
-    """
-
     __popen(["gtk-launch", __query_default("file_manager")])
     return __("File manager launched successfully!")
 
-def get_content_from_clipboard():
-    """
-    Get content from user's clipboard. 
-
-    If could not read from clipboard, returns error message about it
-    """
-
+def get_content_from_user_clipboard():
     if os.environ.get("WAYLAND_DISPLAY"):
         commands = [
             ["wl-paste", "--no-newline"]
