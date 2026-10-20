@@ -21,8 +21,7 @@ class Friday(Voice, History):
 
         arch = self.model_info.modelinfo.get("general.architecture")
         capabilities = self.model_info.capabilities
-        self.supports_tools = "tools" in capabilities
-
+        supports_tools = "tools" in capabilities
         required_context_length = config.get("ai", "num_ctx")
 
         if required_context_length == "unlimited":
@@ -46,7 +45,7 @@ class Friday(Voice, History):
         with open(SYSTEM_PROMPT) as f:
             self.add_system_prompt(f.read())
 
-        if config.get("ai", "use_tools", bool) and self.supports_tools:
+        if config.get("ai", "use_tools", bool) and supports_tools:
             self.tools = { 
                 name: func
                 for name, func in igetmembers(tools, iisfunction)
@@ -59,6 +58,11 @@ class Friday(Voice, History):
 
                 "Use query_stored_messages to search chat history. "
                 "The database contains one table: message(id, timestamp, role, content). Only run read-only queries.\n"
+
+                "Use search_files to find files. When the user refers to a standard folder such as "
+                "Documents, Downloads, or Pictures, use its configured XDG user directory. Don't guess the path. "
+                "XDG directories: XDG_DESKTOP_DIR, XDG_DOWNLOAD_DIR (user downloads), XDG_DOCUMENTS_DIR, XDG_MUSIC_DIR, XDG_PICTURES_DIR, XDG_VIDEOS_DIR "
+                "or other XDG_*_DIR directories"
 
                 "You can call more than one tool at once."
             ))
@@ -76,7 +80,7 @@ class Friday(Voice, History):
                 
             log.debug(f"tools: {self.tools}")
 
-        elif self.supports_tools:
+        elif supports_tools:
             log.warn("Tools aren't supported by the model")
 
     def __stream_reply(

@@ -36,7 +36,12 @@ def __run_shell(cmd: str):
     )
 
 def __popen(args: list[str]):
-    subprocess.Popen(args)
+    return subprocess.Popen(
+        args, 
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
 
 def __query_default(app: str) -> Optional[str]:
     mime_types = APP_TYPES[app]
@@ -145,6 +150,13 @@ def open_file_manager():
     __popen(["gtk-launch", __query_default("file_manager")])
     return __("File manager launched successfully!")
 
+def xdg_open(uri: str):
+    """
+    Open a file path or URL with its default desktop app.
+    """
+    __popen(["xdg-open", uri])
+    return __(f"{uri} was opened sucessfully!")
+
 def get_user_selection():
     if os.environ.get("WAYLAND_DISPLAY"):
         commands = [
@@ -174,18 +186,6 @@ def get_user_selection():
 
     return __("Could not read clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11).")
 
-def xdg_open(uri: str):
-    """
-    Open a file path or URL with its default desktop app.
-    """
-
-    out = __run(["xdg-open", uri])
-
-    if out.returncode != 0:
-        return __(f"Could not launch: {out.stderr.strip()}")
-    
-    return __(f"{uri} was launched sucessfully!")
-
 def look_at_the_screen():
     """
     Take a screenshot of what's going on user's screen right now.
@@ -212,28 +212,44 @@ def read_file(path: str):
     except Exception as e:
         return __(f"Could not read file: {e}")
 
-def search_files(pattern: str, begin: str = "~"):
+def view_media(images: list[str] = None, audio: list[str] = None):
+    return __("Requested media", images, audio)
+
+def search_files(
+    patterns: str | list[str], 
+    begin: str = "~"
+):
     """
     Args:
         pattern: file pattern to search, supports wildcards
-        begin: Search root - you can use a path, and envrironment variables
+        begin: Search root - a path, environment variable.
     """
 
-    matches = []
-    begin = os.path.expandvars(os.path.expanduser(begin))
+    candidate = os.path.expanduser(begin)
 
-    if not os.path.exists(begin):
-        return __("Begin directory does not exist")
+    if not os.path.exists(candidate):
+        candidate = os.environ.get(begin)
+
+        if not candidate or not os.path.exists(candidate):
+            return __("Begin directory does not exist")
+
+    begin = candidate
+
+    if isinstance(patterns, str):
+        patterns = [patterns]
+
+    matches = []
+    skipped_dirs = {".cache", ".git", "node_modules", "__pycache__"}
 
     for folder, dirs, files in os.walk(begin):
-        dirs[:] = [d for d in dirs if d not in {".cache", ".git", "node_modules", "__pycache__"}]
+        dirs[:] = [d for d in dirs if d not in skipped_dirs]
 
         for name in files:
-            if fnmatch.fnmatch(name.casefold(), pattern.casefold()):
+            if any(fnmatch.fnmatchcase(name.casefold(), p.casefold())
+                   for p in patterns):
+                if len(matches) == 100:
+                    matches.append("...Result limit reached.")
+                    return __(matches)
                 matches.append(os.path.join(folder, name))
-                
-                if len(matches) >= 40:
-                    matches.append("...Limit was reached!")
-                    break
 
     return __(matches)

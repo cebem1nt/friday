@@ -2,6 +2,9 @@
 
 Fully local linux AI assistant infrastructure built on top of ollama.
 
+> [!WARNING]
+> Work in progress, some things might not work correctly
+
 ## Installation 
 
 Setup with `uv`:
@@ -17,6 +20,7 @@ Then copy default config to `~/.config/friday/`:
 ```sh
 mkdir -p ~/.config/friday/
 cp assets/config.ini ~/.config/friday/
+cp assets/system_prompt.md ~/.config/friday/
 ```
 
 ### Voices
@@ -35,7 +39,7 @@ curl -L -o voices-v1.0.bin \
 ## Usage
 
 ```sh
-# Run the IPC server once
+# Run the IPC server once at startup
 ./fridayd
 ```
 
@@ -96,6 +100,10 @@ keep_recent_turns = 3
 # Older conversation turns that exceed the remaining context budget are archived
 # in the database and removed from the active chat history.
 context_reserve = 2000
+
+# Send various notifications (e.g reply message, listening status, etc)
+# requires notify-send
+send_notifications = true
 
 [tts]
 # Text to speech model (AI voice)
