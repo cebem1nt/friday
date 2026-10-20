@@ -1,7 +1,13 @@
 from datetime import datetime
 from contextlib import contextmanager, closing
+from src import config
 
-import random, os, sqlite3
+import random, os, sqlite3, subprocess
+
+# This one definitely works with papirus icon theme
+FRIDAY_ICONS = [
+    f"si-syncthing-{n}" for n in range(1, 12)
+]
 
 THINKING_QUOTES = [
     "Processing your request",
@@ -42,6 +48,17 @@ def random_thinking_quote():
 
 def today():
     return datetime.today().strftime('%Y-%m-%d')
+
+def notify(message: str, details: str):
+    if not config.get("misc", "send_notifications", bool):
+        return
+
+    icon = random.choice(FRIDAY_ICONS)
+    subprocess.Popen([
+        "notify-send", message, details,
+            "-a", "friday", 
+            "-i", icon 
+    ])
 
 class Database:
     def __init__(self):

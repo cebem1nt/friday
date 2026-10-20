@@ -9,12 +9,15 @@ from src import config, log
 
 import os, ollama, re
 
+SYSTEM_PROMPT = os.path.expanduser("~/.config/friday/system_prompt.md")
+
 class Friday(Voice, History):
     max_tool_calls_rounds = 20
 
     def __init__(self):
         self.model = config.get("ai", "model")
         self.model_info = ollama.show(self.model)
+        self.tools = {}
 
         arch = self.model_info.modelinfo.get("general.architecture")
         capabilities = self.model_info.capabilities
@@ -38,16 +41,10 @@ class Friday(Voice, History):
             log.info("Thinking is not supported by model")
             self.think = None
 
-        self.add_system_prompt((
-            "You're friday: local AI assistant. You are serious, simple, but helpfull. You don't treat user as dumb by default. "
-            "Be brief, unless necessary. Never use emoji! Answer directly and concisely. Avoid unnecessary analysis. "
-            "You're speaking assistant, that means your responses are spoken aloud, do not use markdown formatting unless user asks "
-            "You should ask questions if it helps to do what user wants or improves preciseness of your response. "
-            "You have a single chat messages history, messages that don't fit into your context window go to a database"
-            f"Speak in english by default. Date today: {common.today()}"
-        ))
+        self.add_system_prompt(f"Date today: {common.today()}")
 
-        self.tools = {}
+        with open(SYSTEM_PROMPT) as f:
+            self.add_system_prompt(f.read())
 
         if config.get("ai", "use_tools", bool) and self.supports_tools:
             self.tools = { 
@@ -57,18 +54,13 @@ class Friday(Voice, History):
             }
 
             self.add_system_prompt((
-                "Use query_stored_messages to search for messages stored in the database."
-                "Pass an sql query to it, db has a single table named message: "
-                """
-                ```
-                message (
-                    id INTEGER PRIMARY KEY,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL
-                )
-                ```
-                """
+                "Use get_user_selection to get content from clipboard. "
+                "User might refer to selected content as \"this\" or \"the selection\". It may return text, a file path, or a URL. \n"
+
+                "Use query_stored_messages to search chat history. "
+                "The database contains one table: message(id, timestamp, role, content). Only run read-only queries.\n"
+
+                "You can call more than one tool at once."
             ))
 
             if config.get("misc", "web_search_provider") == "none":
@@ -186,9 +178,10 @@ class Friday(Voice, History):
     def reply(
         self, 
         prompt: str, 
-        stream: bool = True,
         images: Optional[list[str]] = None, 
-        audio: Optional[list[str]] = None
+        audio: Optional[list[str]] = None,
+        stream: bool = True,
+        notify_content: bool = False
     ) -> Iterable[tuple[str, str]] | str:
         self.shut_up()
         generation = self._generation
@@ -210,6 +203,10 @@ class Friday(Voice, History):
 
             self.done_speaking()
             log.debug(f"context used: {self.context_used}/{self.context_total}")
+            
+            if notify_content:
+                common.notify("Reply from friday", output)
+            
             return output
 
         gen = generator()
@@ -231,4 +228,4 @@ class Friday(Voice, History):
             return None
 
         prompt = self.done_listening()
-        return self.reply(prompt, stream)
+        return self.reply(prompt, stream=stream, notify_content=True)

@@ -1,6 +1,6 @@
 # friday
 
-Fully local light linux AI assistant infrastructure built on top of ollama.
+Fully local linux AI assistant infrastructure built on top of ollama.
 
 ## Installation 
 
@@ -52,7 +52,6 @@ curl -L -o voices-v1.0.bin \
 You can modify your `~/.config/friday/config.ini`:
 
 ```ini
-
 [ai]
 # Ollama model to use
 model = gemma4:e4b
@@ -85,7 +84,7 @@ web_search_provider = ddgs
 searxng_url = http://localhost:8888/
 
 # Friday can take a screenshot of your screen (yes, only if you ask it to)
-# given path to the script should print path to the screenshot on success
+# given script should print screenshot path to stdout on success
 # Note that screenshots will not be automatically deleted later. 
 screenshot_cmd = ~/.local/bin/screenshot
 

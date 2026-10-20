@@ -1,8 +1,9 @@
-import ollama, subprocess, os, shutil
-
 from typing import Optional, Any
+
 from src.friday import common
 from src import config
+
+import ollama, subprocess, os, shutil, fnmatch
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 
@@ -134,10 +135,6 @@ elif WEB_SEARCH_PROVIDER == "searxng":
         return __(text or "")
 
 def query_stored_messages(sql: str):
-    """
-    Args:
-      sql to execute. Database has only "message" table
-    """
     return __(common.db.query(sql))
 
 def open_web_browser():
@@ -148,7 +145,7 @@ def open_file_manager():
     __popen(["gtk-launch", __query_default("file_manager")])
     return __("File manager launched successfully!")
 
-def get_content_from_user_clipboard():
+def get_user_selection():
     if os.environ.get("WAYLAND_DISPLAY"):
         commands = [
             ["wl-paste", "--no-newline"]
@@ -177,35 +174,17 @@ def get_content_from_user_clipboard():
 
     return __("Could not read clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11).")
 
-def open_content(content: str):
+def xdg_open(uri: str):
     """
-    Tries to open any given user's content in prefered app using xdg-open.
-
-    Args:
-      content: file path, web url, image path, etc.
+    Open a file path or URL with its default desktop app.
     """
 
-    out = __run(["xdg-open", content])
+    out = __run(["xdg-open", uri])
 
     if out.returncode != 0:
         return __(f"Could not launch: {out.stderr.strip()}")
     
-    return __(f"{content} was launched sucessfully!")
-
-def read_content_from_selected_file():
-    """
-    Gives you the content of user's selected file.
-    User might refer it as current file or active file, or this file
-    """
-
-    path_like = get_content_from_clipboard()
-    path_like = os.path.expanduser(path_like)
-
-    if os.path.exists(path_like) and os.path.isfile(path_like):
-        with open(path_like, "r") as f:
-            return __(f.read())
-
-    return __("Current user's selected content does not look like a file")
+    return __(f"{uri} was launched sucessfully!")
 
 def look_at_the_screen():
     """
@@ -225,14 +204,36 @@ def look_at_the_screen():
 
     return __("Screenshot of on-screen content", [out.stdout.strip()])
 
-# def rick_roll(name: str):
-#     """
-#     Open website with given name
-#     """
+def read_file(path: str):
+    try:
+        with open(path, "r") as f:
+            return __(f.read())
 
-#     subprocess.run(["zen", "--new-window", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1&pp=ygUXbmV2ZXIgZ29ubmEgZ2l2ZSB5b3UgdXCgBwE%3D"])
-#     subprocess.run("sleep 5", shell=True)
-#     subprocess.run("ydotool mousemove --absolute 450 250", shell=True)
-#     subprocess.run("ydotool click 0xC0", shell=True)
+    except Exception as e:
+        return __(f"Could not read file: {e}")
 
-#     return "Succes!"
+def search_files(pattern: str, begin: str = "~"):
+    """
+    Args:
+        pattern: file pattern to search, supports wildcards
+        begin: Search root - you can use a path, and envrironment variables
+    """
+
+    matches = []
+    begin = os.path.expandvars(os.path.expanduser(begin))
+
+    if not os.path.exists(begin):
+        return __("Begin directory does not exist")
+
+    for folder, dirs, files in os.walk(begin):
+        dirs[:] = [d for d in dirs if d not in {".cache", ".git", "node_modules", "__pycache__"}]
+
+        for name in files:
+            if fnmatch.fnmatch(name.casefold(), pattern.casefold()):
+                matches.append(os.path.join(folder, name))
+                
+                if len(matches) >= 40:
+                    matches.append("...Limit was reached!")
+                    break
+
+    return __(matches)

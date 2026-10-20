@@ -46,7 +46,7 @@ def get(group: str, opt: str, _type=str):
     except:
         return None
 
-# Hell yeah, im going to make friday be able to modify itself at runtime
+# TODO Hell yeah, im going to make friday be able to modify it's config at runtime
 def set(group: str, opt: str, value: Any):
     if _config is None:
         _populate_config()
