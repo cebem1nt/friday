@@ -3,41 +3,40 @@ import argparse
 
 from src import log
 
-# TODO this argparse is ugly
-
 if __name__ == "__main__": 
-    p = argparse.ArgumentParser()
+    p = argparse.ArgumentParser(description="Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.")
 
-    p.add_argument("-s", "--serve",     action="store_true", help="run friday server")
-    p.add_argument("-a", "--ask",       help="ask friday given content")
-    p.add_argument("-c", "--chat",      action="store_true", help="open a CLI chat with friday")
-    p.add_argument("-C", "--converse",  action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
+    subparsers = p.add_subparsers(dest="command", help="available commands")
+
+    serve_p = subparsers.add_parser("serve", help="start friday IPC server")
+    serve_p.add_argument("-l", "--log-level", type=int, default=2, 
+        help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
+
+    p.add_argument("-a", "--ask",       help="ask friday given content (pass as single argument)")
+    p.add_argument("-c", "--converse",  action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",      action="store_true", help="wipe current messages history, won't archive messages to database by default")
     p.add_argument("-A", "--archive",   action="store_true", help="used only with --wipe: also archive current messages to the database")
-    p.add_argument("-L", "--log-level", type=int, default=4, help="friday server log level from 0 to 4. 4 -> debug, info, warnings, errors. 2 -> warnings, errors")
 
     args = p.parse_args()
 
-    if args.log_level:
-        log.set_log_level(args.log_level)
-
-    if args.serve:
+    if args.command == "serve":
         from src.ipc.server import friday_serve
+        log.set_log_level(args.log_level)
         friday_serve()
         exit(0)
 
     from src.ipc.client import FridayClient
     client = FridayClient()
 
-    if args.chat:
+    if args.wipe:
+        print(client.wipe_history(args.archive))
+
+    if args.converse:
+        client.converse_text()
+    elif args.ask:
+        print(client.reply_text(args.ask)["reply"])
+    else:
         from src.cli import CLI
 
         cli = CLI(client)
         cli.chat()
-
-    elif args.converse:
-        client.converse_text()
-    elif args.ask:
-        print(client.reply_text(args.ask)["reply"])
-    elif args.wipe:
-        print(client.wipe_history(args.archive))

@@ -1,11 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor, Future
+from typing import Callable, Optional
+
+from src.friday.common import parse_duration
+from src import config, log
 
 import numpy as np
 import sounddevice as sd
-import re, os, threading
-
-from src import config, log
-from typing import Callable
+import re, os, threading, time
 
 def record_audio(
     samplerate: int = 16000, 
@@ -45,9 +46,16 @@ class Voice:
 
         # Audio chunks are tagged with a generation number. stop_speaking()
         # changes the generation, making old queued chunks invalid.
-        self._generation = 0
+        self.generation = 0
+
         self.kokoro = None
         self.whisper = None
+
+        self.kokoro_unload_after = config.get("tts", "unload_after", parse_duration)
+        self.whisper_unload_after = config.get("stt", "unload_after", parse_duration)
+
+        self.voice = config.get("tts", "voice")
+        self.speed = config.get("tts", "speed", float)
 
         if config.get("tts", "pre_allocate", bool):
             self.__init_kokoro()
@@ -66,10 +74,12 @@ class Voice:
         log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
         
+        self._kokoro_last_used = time.monotonic()
+        self._whisper_last_used = time.monotonic()
         self._stream_lock = threading.Lock()
         self._listen_lock = threading.Lock()
-        self._listen_future: Future | None = None
-        self._stop_recording: Callable | None = None
+        self._listen_future: Optional[Future] = None
+        self._stop_recording: Optional[Callable] = None
 
     def __init_whisper(self):
         log.info("VoiceProvider: Setting up whisper...")
@@ -100,44 +110,57 @@ class Voice:
             voices_path=config.get("tts", "voices_path", os.path.expanduser)
         )
 
-        self.voice = config.get("tts", "voice")
-
     def _synthesize(self, text: str, generation: int):
-        if generation != self._generation:
-            return
-
-        samples, _ = self.kokoro.create(
-            text,
-            voice=self.voice,
-            speed=1.0,
-            lang="en-us",
-        )
-
-        if generation != self._generation:
+        if generation != self.generation:
             return
 
         try:
+            samples, _ = self.kokoro.create(
+                text, voice=self.voice, speed=self.speed, lang="en-us")
+    
+            if generation != self.generation:
+                return
+
             with self._stream_lock:
-                if generation != self._generation:
+                if generation != self.generation:
                     return
 
                 self._output_stream.write(samples.tobytes())
                 
         except sd.PortAudioError:
-            if generation != self._generation:
+            if generation != self.generation:
                 return
-                
             raise
 
-    def say(self, text: str):
+        finally:
+            self._kokoro_last_used = time.monotonic()
+
+    def unload_kokoro_if_idle(self):
+        idle_for = time.monotonic() - self._kokoro_last_used
+        
+        if self.kokoro is not None and idle_for >= self.kokoro_unload_after:
+            log.info("Unloading kokoro")
+            self.kokoro = None
+
+    def unload_whisper_if_idle(self):
+        idle_for = time.monotonic() - self._whisper_last_used
+
+        if self.whisper is not None and idle_for >= self.whisper_unload_after:
+            log.info("Unloading whisper")
+            self.whisper = None
+
+    def say(self, text: str, generation: Optional[int] = None):
         """
         Unbuffered -> gets text -> says it
         """
+        if generation is None:
+            generation = self.generation
+
         if self.kokoro is None:
             self.__init_kokoro()
 
         self._speech_executor.submit(
-            self._synthesize, text, self._generation)
+            self._synthesize, text, self.generation)
 
     def speak(self, text: str, generation: int):
         """
@@ -158,17 +181,11 @@ class Voice:
                     sentences.append(sentence)
 
         for sentence in sentences:
-            if self._generation != generation:
+            if self.generation != generation:
                 return
 
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
-
-            if self.kokoro is None:
-                self.__init_kokoro()
-
-            self._speech_executor.submit(
-                self._synthesize, sentence, generation
-            )
+            self.say(sentence, generation)
 
     def done_speaking(self):
         """
@@ -180,7 +197,7 @@ class Voice:
             self._speech_buffer = ""
 
         if text:
-            self._speech_executor.submit(self._synthesize, text, self._generation)
+            self._speech_executor.submit(self._synthesize, text, self.generation)
 
     def listen(self):
         with self._listen_lock:
@@ -206,8 +223,8 @@ class Voice:
 
     def shut_up(self):
         with self._buffer_lock:
-            self._generation += 1
-            log.debug(f"shifted self._generation = {self._generation}")
+            self.generation += 1
+            log.debug(f"shifted self.generation = {self.generation}")
             self._speech_buffer = ""
 
         with self._stream_lock:
@@ -217,8 +234,13 @@ class Voice:
         if self.whisper is None:
             self.__init_whisper()
 
-        segments, info = self.whisper.transcribe(audio)
-        return "".join(segment.text for segment in segments).strip()
+        try:
+            segments, info = self.whisper.transcribe(audio)
+            out = "".join(segment.text for segment in segments).strip()
+        finally:
+            self._whisper_last_used = time.monotonic()
+
+        return out
 
     def is_listening(self):
         return self._listen_future is not None and self._stop_recording is not None

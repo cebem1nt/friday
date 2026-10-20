@@ -22,4 +22,4 @@ if [[ -e ".env" ]]; then
 fi
 
 source .venv/bin/activate
-./friday -s
+./friday serve --log-level=4

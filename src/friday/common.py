@@ -60,6 +60,28 @@ def notify(message: str, details: str):
             "-i", icon 
     ])
 
+def parse_duration(value: str) -> float:
+    value = value.strip().lower()
+
+    if len(value) < 2:
+        raise ValueError("Use a number followed by s, m, or h")
+
+    unit = value[-1]
+    multipliers = { "s": 1, "m": 60, "h": 3600 }
+
+    if unit not in multipliers:
+        raise ValueError("Duration unit must be s, m, or h")
+
+    try:
+        amount = float(value[:-1].strip())
+    except ValueError:
+        raise ValueError("Invalid duration amount") from None
+
+    if amount < 0:
+        raise ValueError("Duration cannot be negative")
+
+    return amount * multipliers[unit]
+
 class Database:
     def __init__(self):
         data_home = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share/"))

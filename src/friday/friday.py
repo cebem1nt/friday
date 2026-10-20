@@ -188,7 +188,7 @@ class Friday(Voice, History):
         notify_content: bool = False
     ) -> Iterable[tuple[str, str]] | str:
         self.shut_up()
-        generation = self._generation
+        generation = self.generation
 
         def generator():
             is_thinking = False

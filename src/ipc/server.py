@@ -1,4 +1,4 @@
-import os, json, socketserver, sys, socket
+import os, json, socketserver, sys, socket, time
 from typing import Any, Callable, Optional
 
 from src import log
@@ -57,6 +57,21 @@ class FridayServer(socketserver.StreamRequestHandler):
                 self._send_json({"error": f"internal error: {exc}"})
                 raise exc
 
+class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
+    def __init__(self, *args, task_interval: int = 60, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.task_interval = task_interval
+        self._next_task = time.monotonic() + task_interval
+
+    def service_actions(self):
+        if time.monotonic() < self._next_task:
+            return
+
+        self.fr.unload_kokoro_if_idle()
+        self.fr.unload_whisper_if_idle()
+
+        self._next_task = time.monotonic() + self.task_interval
+
 def friday_server_is_running():
     if not os.path.exists(SOCKET_PATH):
         return False
@@ -70,17 +85,18 @@ def friday_server_is_running():
                 os.unlink(SOCKET_PATH)
             return False
 
-
 def friday_serve():
     if friday_server_is_running():
         print("Friday server is allready running!", file=sys.stderr)
         exit(1)        
 
-    with socketserver.ThreadingUnixStreamServer(SOCKET_PATH, FridayServer) as server:
+    with FridayThreadingUnixStreamServer(SOCKET_PATH, FridayServer) as server:
         os.chmod(SOCKET_PATH, 0o600)
         log.info("Importing Friday, ollama...")
+
         from src.friday.friday import Friday
         server.fr = Friday()
+        
         log.info(f"Ready on {SOCKET_PATH}")
         
         try:
