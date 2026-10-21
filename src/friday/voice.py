@@ -105,6 +105,14 @@ class Voice:
 
         from kokoro_onnx import Kokoro
 
+        self.language = config.get("tts", "language")
+        self.g2p = None
+
+        if not self.language.startswith("en"):
+            from misaki.espeak import EspeakG2P
+
+            self.g2p = EspeakG2P(language=self.language)
+
         self.kokoro = Kokoro(
             model_path=config.get("tts", "model_path", os.path.expanduser),
             voices_path=config.get("tts", "voices_path", os.path.expanduser)
@@ -115,9 +123,14 @@ class Voice:
             return
 
         try:
-            samples, _ = self.kokoro.create(
-                text, voice=self.voice, speed=self.speed, lang="en-us")
-    
+            if self.g2p is not None:
+                phonemes, _ = self.g2p(text)
+                samples, _ = self.kokoro.create(
+                    phonemes, voice=self.voice, speed=self.speed, is_phonemes=True)
+            else:
+                samples, _ = self.kokoro.create(
+                    text, voice=self.voice, speed=self.speed, lang=self.language)
+
             if generation != self.generation:
                 return
 

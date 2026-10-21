@@ -2,6 +2,7 @@ sounddevice
 faster-whisper
 ollama
 ddgs
+misaki-fork[en]
 kokoro-onnx
 onnxruntime-gpu
 nvidia-cublas-cu12 
