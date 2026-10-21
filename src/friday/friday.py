@@ -53,17 +53,20 @@ class Friday(Voice, History):
             }
 
             self.add_system_prompt((
+                "Use run_cmd to run shell command. Do not run any destructive command unless user specifically approves that. "
+                "Do not use sudo nor execute commands that require root acess under any circumstances!\n"
+
                 "Use get_user_selection to get content from clipboard. "
-                "User might refer to selected content as \"this\" or \"the selection\". It may return text, a file path, or a URL. \n"
+                "User might refer to selected content as \"this *\" or \"the selection\". It may return text, a directory, path, or a URL. \n"
 
                 "Use run_messages_history_sql to execute sql in your chat history database. You can run any sql you think is needed."
                 "DB has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
-                "Tags help you find messages later, it can be: USER_INFO (personal information), PREFERENCE, MISC"
+                "Tags help you find messages later, it can be: USER_INFO (personal information), PREFERENCE, MISC\n"
 
                 "Use search_files to find files. When the user refers to a standard folder such as "
                 "Documents, Downloads, or Pictures, use its configured XDG user directory. Don't guess the path. "
                 "XDG directories: XDG_DESKTOP_DIR, XDG_DOWNLOAD_DIR (user downloads), XDG_DOCUMENTS_DIR, XDG_MUSIC_DIR, XDG_PICTURES_DIR, XDG_VIDEOS_DIR "
-                "or other XDG_*_DIR directories"
+                "or other XDG_*_DIR directories\n"
 
                 "You can call more than one tool at once."
             ))

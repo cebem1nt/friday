@@ -142,6 +142,9 @@ elif WEB_SEARCH_PROVIDER == "searxng":
 def run_messages_history_sql(sql: str):
     return __(common.db.run_sql(sql))
 
+def run_cmd(cmd: str):
+    return __(__run_shell(cmd))
+
 def open_web_browser():
     __popen(["gtk-launch", __query_default("browser")])
     return __("Web browser launched successfully!")
