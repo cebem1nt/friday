@@ -139,8 +139,8 @@ elif WEB_SEARCH_PROVIDER == "searxng":
 
         return __(text or "")
 
-def query_stored_messages(sql: str):
-    return __(common.db.query(sql))
+def run_messages_history_sql(sql: str):
+    return __(common.db.run_sql(sql))
 
 def open_web_browser():
     __popen(["gtk-launch", __query_default("browser")])
@@ -172,14 +172,7 @@ def get_user_selection():
         if not shutil.which(command[0]):
             continue
 
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
+        result = __run(command)
 
         if result.returncode == 0:
             return __(result.stdout)
@@ -212,11 +205,31 @@ def read_file(path: str):
     except Exception as e:
         return __(f"Could not read file: {e}")
 
+def write_to_file(path: str, content: str, append_to_the_end: bool = False):
+    path = os.path.expanduser(path)
+
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, exist_ok=True)
+
+    mode = "a" if append_to_the_end else "w"
+
+    with open(path, mode, encoding="utf-8") as f:
+        f.write(content)
+
+    return __(f"Content was written to {path}")
+
+def change_directory(directory: str):
+    if not os.path.exists(directory):
+        return __("Directory does not exist")
+
+    os.chdir(directory)
+    return __("Sucess")
+
 def view_media(images: list[str] = None, audio: list[str] = None):
     return __("Requested media", images, audio)
 
 def search_files(
-    patterns: str | list[str], 
+    patterns: list[str] = [], 
     begin: str = "~"
 ):
     """
@@ -234,9 +247,6 @@ def search_files(
             return __("Begin directory does not exist")
 
     begin = candidate
-
-    if isinstance(patterns, str):
-        patterns = [patterns]
 
     matches = []
     skipped_dirs = {".cache", ".git", "node_modules", "__pycache__"}

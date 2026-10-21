@@ -15,7 +15,6 @@ if __name__ == "__main__":
     p.add_argument("-a", "--ask",       help="ask friday given content (pass as single argument)")
     p.add_argument("-c", "--converse",  action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",      action="store_true", help="wipe current messages history, won't archive messages to database by default")
-    p.add_argument("-A", "--archive",   action="store_true", help="used only with --wipe: also archive current messages to the database")
 
     args = p.parse_args()
 
@@ -29,7 +28,7 @@ if __name__ == "__main__":
     client = FridayClient()
 
     if args.wipe:
-        print(client.wipe_history(args.archive))
+        print(client.wipe_history())
 
     if args.converse:
         client.converse_text()

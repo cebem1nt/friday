@@ -91,12 +91,28 @@ class Database:
 
         with self.con() as con:
             con.execute("""
-            CREATE TABLE IF NOT EXISTS message (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL
-            )
+                CREATE TABLE IF NOT EXISTS message (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL
+                )
+            """)
+
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS tag (
+                    name TEXT PRIMARY KEY
+                )
+            """)
+
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS message_tags (
+                    message_id INTEGER NOT NULL,
+                    tag_name TEXT NOT NULL,
+                    PRIMARY KEY (message_id, tag_name),
+                    FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE,
+                    FOREIGN KEY (tag_name) REFERENCES tag(name) ON DELETE CASCADE
+                )
             """)
 
     @contextmanager
@@ -112,21 +128,39 @@ class Database:
         with self.con() as con:
             con.execute("INSERT INTO message (role, content) VALUES (?, ?)", (role, content))
 
-    def query(self, sql: str, limit: int = 25):
+    def run_sql(self, sql: str, limit: int = 25):
         if limit < 1:
             raise ValueError("limit must be at least 1")
 
+        results = []
+        statement = ""
+
         with self.con() as con:
-            con.execute("PRAGMA query_only = ON")
-            cursor = con.execute(sql)
+            statements = []
 
-            if cursor.description is None:
-                return []
+            for char in sql:
+                statement += char
+                if char == ";" and sqlite3.complete_statement(statement):
+                    statements.append(statement)
+                    statement = ""
 
-            columns = [column[0] for column in cursor.description]
-            return [
-                dict(zip(columns, row))
-                for row in cursor.fetchmany(limit)
-            ]
+            if statement.strip():
+                statements.append(statement)
+
+            for statement in statements:
+                cursor = con.execute(statement)
+
+                if cursor.description is not None:
+                    remaining = limit - len(results)
+                    if remaining <= 0:
+                        break
+
+                    columns = [column[0] for column in cursor.description]
+                    results.extend(
+                        dict(zip(columns, row))
+                        for row in cursor.fetchmany(remaining)
+                    )
+
+        return results
 
 db = Database()

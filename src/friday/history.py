@@ -4,17 +4,6 @@ from typing import Optional
 from src.friday.common import db
 from src import log, config
 
-def should_archive(message: dict):
-    role = message["role"]
-
-    if role == "tool":
-        return False
-
-    if role == "assistant" and message.get("tool_calls"):
-        return False 
-
-    return True
-
 def estimate_tokens(messages: list[dict]):
     text = 0
     media = 0
@@ -101,6 +90,7 @@ class History:
         self._current_turn.messages.append(message)
 
         if finish_turn:
+            self._store_turn(self._current_turn)
             self.finish_turn()
             self.prune()
 
@@ -118,7 +108,6 @@ class History:
             if not oldest.is_completed:
                 break
 
-            self._archive_turn(oldest)
             self._turns.pop(0)
 
             # This is an approximation
@@ -135,20 +124,20 @@ class History:
         self._current_turn.is_completed = True
         self._current_turn = None
 
-    def _archive_turn(self, turn: Turn):
+    def _store_turn(self, turn: Turn):
         for message in turn.messages:
-            if should_archive(message):
-                log.info(f"Archiving message: {message}")
-                db.add_message_entry(message["role"], message["content"])
+            role = message["role"]
 
-    def wipe_turns(self, archive: bool = False):
-        log.info("Wiping current turns history")
+            if role == "tool":
+                continue
 
-        if archive:
-            log.info("Archiving...")
-            for turn in self._turns:
-                self._archive_turn(turn)
-        
+            if role == "assistant" and message.get("tool_calls"):
+                continue
+
+            db.add_message_entry(message["role"], message["content"])
+
+    def wipe_turns(self):
+        log.info("Wiping current turns history")        
         self._turns = []
         self._current_turn = None
 

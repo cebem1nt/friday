@@ -98,9 +98,6 @@ def friday_serve():
         server.fr = Friday()
         
         log.info(f"Ready on {SOCKET_PATH}")
-        
-        try:
-            os.chdir(os.getenv("HOME"))
-            server.serve_forever()
-        finally:
-            server.fr.wipe_turns(archive=True)
+    
+        os.chdir(os.getenv("HOME"))
+        server.serve_forever()

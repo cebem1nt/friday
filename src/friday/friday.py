@@ -12,7 +12,7 @@ import os, ollama, re
 SYSTEM_PROMPT = os.path.expanduser("~/.config/friday/system_prompt.md")
 
 class Friday(Voice, History):
-    max_tool_calls_rounds = 20
+    max_tool_calls_rounds = 100
 
     def __init__(self):
         self.model = config.get("ai", "model")
@@ -56,8 +56,9 @@ class Friday(Voice, History):
                 "Use get_user_selection to get content from clipboard. "
                 "User might refer to selected content as \"this\" or \"the selection\". It may return text, a file path, or a URL. \n"
 
-                "Use query_stored_messages to search chat history. "
-                "The database contains one table: message(id, timestamp, role, content). Only run read-only queries.\n"
+                "Use run_messages_history_sql to execute sql in your chat history database. You can run any sql you think is needed."
+                "DB has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
+                "Tags help you find messages later, it can be: USER_INFO (personal information), PREFERENCE, MISC"
 
                 "Use search_files to find files. When the user refers to a standard folder such as "
                 "Documents, Downloads, or Pictures, use its configured XDG user directory. Don't guess the path. "
