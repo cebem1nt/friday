@@ -70,6 +70,7 @@ class CLI:
         while True:
             try:
                 prompt = input(">> ")
+
             except (EOFError, KeyboardInterrupt):
                 return
 
@@ -79,7 +80,7 @@ class CLI:
                     print("/record  -> record audio prompt")
                     continue
                 
-                if prompt == "/quit":
+                if prompt == "/quit" or prompt == "/exit":
                     return
 
                 elif prompt == "/record":
@@ -94,8 +95,10 @@ class CLI:
 
             try:
                 with no_stdin_echo():
-                    if USE_RICH: self.__ask_rich(prompt)
-                    else: self.__ask_no_rich(prompt)
+                    if USE_RICH: 
+                        self.__ask_rich(prompt)
+                    else: 
+                        self.__ask_no_rich(prompt)
                         
             except (EOFError, KeyboardInterrupt):
                 self.fr.shut_up()

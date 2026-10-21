@@ -118,7 +118,7 @@ class Voice:
             voices_path=config.get("tts", "voices_path", os.path.expanduser)
         )
 
-    def _synthesize(self, text: str, generation: int):
+    def __synthesize(self, text: str, generation: int):
         if generation != self.generation:
             return
 
@@ -173,7 +173,7 @@ class Voice:
             self.__init_kokoro()
 
         self._speech_executor.submit(
-            self._synthesize, text, self.generation)
+            self.__synthesize, text, self.generation)
 
     def speak(self, text: str, generation: int):
         """
@@ -210,19 +210,19 @@ class Voice:
             self._speech_buffer = ""
 
         if text:
-            self._speech_executor.submit(self._synthesize, text, self.generation)
+            self._speech_executor.submit(self.__synthesize, text, self.generation)
 
     def listen(self):
         with self._listen_lock:
             if self.is_listening():
-                raise RuntimeError("Already recording.")
+                raise RuntimeError("Already listening.")
 
             self._listen_future, self._stop_recording = record_audio()
 
     def done_listening(self) -> str:
         with self._listen_lock:
             if not self.is_listening():
-                raise RuntimeError("Not currently recording.")
+                raise RuntimeError("Not currently listening.")
 
             future = self._listen_future
             self._stop_recording()

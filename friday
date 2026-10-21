@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse
+import argparse, os
 
 from src import log
 
@@ -12,9 +12,11 @@ if __name__ == "__main__":
     serve_p.add_argument("-l", "--log-level", type=int, default=2, 
         help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
 
-    p.add_argument("-a", "--ask",       help="ask friday given content (pass as single argument)")
-    p.add_argument("-c", "--converse",  action="store_true", help="start recording audio input, when run once more - stop recording and get response from friday")
-    p.add_argument("-w", "--wipe",      action="store_true", help="wipe current messages history, won't archive messages to database by default")
+    p.add_argument("-c", "--converse",    action="store_true", help="start recording audio, when run once more - stop recording and get response from friday")
+    p.add_argument("-w", "--wipe",        action="store_true", help="wipe current friday context")
+    p.add_argument("-a", "--ask",         help="ask friday given content (pass as single argument)")
+    p.add_argument("--image", nargs='+',  help="attach these image[s]. use with --ask")
+    p.add_argument("--audio", nargs='+',  help="attach audio. use with --ask")
 
     args = p.parse_args()
 
@@ -28,12 +30,13 @@ if __name__ == "__main__":
     client = FridayClient()
 
     if args.wipe:
-        print(client.wipe_history())
+        print(client.wipe_context())
 
     if args.converse:
-        client.converse_text()
+        client.converse(False)
     elif args.ask:
-        print(client.reply_text(args.ask)["reply"])
+        print(client.reply(
+            args.ask, images=args.image, audio=args.audio, stream=False))
     else:
         from src.cli import CLI
 

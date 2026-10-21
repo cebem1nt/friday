@@ -209,7 +209,8 @@ def read_file(path: str):
         return __(f"Could not read file: {e}")
 
 def write_to_file(path: str, content: str, append_to_the_end: bool = False):
-    path = os.path.expanduser(path)
+    path = os.path.expanduser(
+        os.path.expandvars(path))
 
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, exist_ok=True)
@@ -238,16 +239,14 @@ def search_files(
     """
     Args:
         pattern: file pattern to search, supports wildcards
-        begin: Search root - a path, environment variable.
+        begin: Search root - a path, or environment variable.
     """
 
-    candidate = os.path.expanduser(begin)
+    begin = os.path.expanduser(
+        os.path.expandvars(begin))
 
-    if not os.path.exists(candidate):
-        candidate = os.environ.get(begin)
-
-        if not candidate or not os.path.exists(candidate):
-            return __("Begin directory does not exist")
+    if not os.path.exists(begin):
+        return __("Begin directory does not exist")
 
     begin = candidate
 

@@ -1,6 +1,6 @@
 from inspect import getmembers as igetmembers, isfunction as iisfunction
 
-from typing import Iterable, Optional
+from typing import Generator, Optional
 
 from src.friday.voice import Voice
 from src.friday.history import History
@@ -53,6 +53,8 @@ class Friday(Voice, History):
             }
 
             self.add_system_prompt((
+                "You can call more than one tool at once.\n"
+
                 "Use run_cmd to run shell command. Do not run any destructive command unless user specifically approves that. "
                 "Do not use sudo nor execute commands that require root acess under any circumstances!\n"
 
@@ -61,14 +63,8 @@ class Friday(Voice, History):
 
                 "Use run_messages_history_sql to execute sql in your chat history database. You can run any sql you think is needed."
                 "DB has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
-                "Tags help you find messages later, it can be: USER_INFO (personal information), PREFERENCE, MISC\n"
-
-                "Use search_files to find files. When the user refers to a standard folder such as "
-                "Documents, Downloads, or Pictures, use its configured XDG user directory. Don't guess the path. "
-                "XDG directories: XDG_DESKTOP_DIR, XDG_DOWNLOAD_DIR (user downloads), XDG_DOCUMENTS_DIR, XDG_MUSIC_DIR, XDG_PICTURES_DIR, XDG_VIDEOS_DIR "
-                "or other XDG_*_DIR directories\n"
-
-                "You can call more than one tool at once."
+                "Tags help you find messages later, tag can be: PERSONAL, PREFERENCE, MISC. "
+                "If user asks you to remember something, you either tag an existing message or create a new one and tag it."
             ))
 
             if config.get("misc", "web_search_provider") == "none":
@@ -104,7 +100,7 @@ class Friday(Voice, History):
             stream = ollama.chat(
                 stream=True,
                 model=self.model,
-                messages=self.messages,
+                messages=self.get_messages(),
                 tools=self.tools.values() if self.tools else None,
                 keep_alive=config.get("ai", "keep_alive"),
                 options={"num_ctx": self.context_total}
@@ -190,7 +186,7 @@ class Friday(Voice, History):
         audio: Optional[list[str]] = None,
         stream: bool = True,
         notify_content: bool = False
-    ) -> Iterable[tuple[str, str]] | str:
+    ) -> Generator[tuple[str, str]] | str:
         self.shut_up()
         generation = self.generation
 
@@ -229,7 +225,10 @@ class Friday(Voice, History):
             except StopIteration as result:
                 return result.value
 
-    def converse(self, stream: bool = True) -> Iterable[tuple[str, str]] | Optional[str]:
+    def converse(
+        self, 
+        stream: bool = True
+    ) -> Generator[tuple[str, str]] | Optional[str]:
         if not self.is_listening():
             self.shut_up()
             self.listen()

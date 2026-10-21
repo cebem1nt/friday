@@ -42,8 +42,19 @@ class History:
         self._turns: list[Turn] = []
         self._current_turn: Optional[Turn] = None
 
-    @property
-    def messages(self):
+    def __store_turn(self, turn: Turn):
+        for message in turn.messages:
+            role = message["role"]
+
+            if role == "tool":
+                continue
+
+            if role == "assistant" and message.get("tool_calls"):
+                continue
+
+            db.add_message_entry(message["role"], message["content"])
+
+    def get_messages(self, system_prompts: bool = True):
         out = list(self._system_prompts)
         
         for turn in self._turns:
@@ -90,7 +101,7 @@ class History:
         self._current_turn.messages.append(message)
 
         if finish_turn:
-            self._store_turn(self._current_turn)
+            self.__store_turn(self._current_turn)
             self.finish_turn()
             self.prune()
 
@@ -124,19 +135,7 @@ class History:
         self._current_turn.is_completed = True
         self._current_turn = None
 
-    def _store_turn(self, turn: Turn):
-        for message in turn.messages:
-            role = message["role"]
-
-            if role == "tool":
-                continue
-
-            if role == "assistant" and message.get("tool_calls"):
-                continue
-
-            db.add_message_entry(message["role"], message["content"])
-
-    def wipe_turns(self):
+    def wipe_context(self):
         log.info("Wiping current turns history")        
         self._turns = []
         self._current_turn = None
