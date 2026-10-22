@@ -180,7 +180,7 @@ def get_user_selection():
         if result.returncode == 0:
             return __(result.stdout)
 
-    return __("Could not read clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11).")
+    return "Could not read clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11)."
 
 def look_at_the_screen():
     """
@@ -191,12 +191,12 @@ def look_at_the_screen():
     screenshot_cmd = config.get("misc", "screenshot_cmd")
 
     if screenshot_cmd is None:
-        return __("Screenshot tool is not configured by user!")
+        return "Screenshot tool is not configured by user!"
 
     out = __run_shell(screenshot_cmd)
     
     if out.returncode != 0:
-        return __("Screenshot failed!")
+        return "Screenshot failed!"
 
     return __("Screenshot of on-screen content", [out.stdout.strip()])
 
@@ -206,7 +206,7 @@ def read_file(path: str):
             return __(f.read())
 
     except Exception as e:
-        return __(f"Could not read file: {e}")
+        return f"Could not read file: {e}"
 
 def write_to_file(path: str, content: str, append_to_the_end: bool = False):
     path = os.path.expanduser(
@@ -220,14 +220,14 @@ def write_to_file(path: str, content: str, append_to_the_end: bool = False):
     with open(path, mode, encoding="utf-8") as f:
         f.write(content)
 
-    return __(f"Content was written to {path}")
+    return f"Content was written to {path}"
 
 def change_directory(directory: str):
     if not os.path.exists(directory):
-        return __("Directory does not exist")
+        return "Directory does not exist"
 
     os.chdir(directory)
-    return __("Sucess")
+    return "Sucess"
 
 def view_media(images: list[str] = None, audio: list[str] = None):
     return __("Requested media", images, audio)
@@ -246,9 +246,7 @@ def search_files(
         os.path.expandvars(begin))
 
     if not os.path.exists(begin):
-        return __("Begin directory does not exist")
-
-    begin = candidate
+        return "Begin directory does not exist"
 
     matches = []
     skipped_dirs = {".cache", ".git", "node_modules", "__pycache__"}

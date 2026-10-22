@@ -3,7 +3,7 @@ from inspect import getmembers as igetmembers, isfunction as iisfunction
 from typing import Generator, Optional
 
 from src.friday.voice import Voice
-from src.friday.history import History
+from src.friday.memory import Memory
 from src.friday import tools, common
 from src import config, log
 
@@ -11,7 +11,7 @@ import os, ollama, re
 
 SYSTEM_PROMPT = os.path.expanduser("~/.config/friday/system_prompt.md")
 
-class Friday(Voice, History):
+class Friday(Voice, Memory):
     max_tool_calls_rounds = 100
 
     def __init__(self):
@@ -30,7 +30,7 @@ class Friday(Voice, History):
             context_length = int(required_context_length)
 
         Voice.__init__(self)
-        History.__init__(self, context_length)
+        Memory.__init__(self, context_length)
 
         log.info("Friday: setting up Friday...")
 
@@ -52,6 +52,8 @@ class Friday(Voice, History):
                     if not name.startswith("__")
             }
 
+            self.tools["clean_memory"] = self.clean_memory 
+
             self.add_system_prompt((
                 "You can call more than one tool at once.\n"
 
@@ -63,7 +65,7 @@ class Friday(Voice, History):
 
                 "Use run_messages_history_sql to execute sql in your chat history database. You can run any sql you think is needed."
                 "DB has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
-                "Tags help you find messages later, tag can be: PERSONAL, PREFERENCE, MISC. "
+                "Tags help you find messages later, tag can be: PERSONAL, PREFERENCE, INTEREST, ROUTINE, WORK "
                 "If user asks you to remember something, you either tag an existing message or create a new one and tag it."
             ))
 
@@ -101,9 +103,10 @@ class Friday(Voice, History):
                 stream=True,
                 model=self.model,
                 messages=self.get_messages(),
+                think=self.think,
                 tools=self.tools.values() if self.tools else None,
                 keep_alive=config.get("ai", "keep_alive"),
-                options={"num_ctx": self.context_total}
+                options={ "num_ctx": self.context_total }
             )
 
             full_reply = ""
@@ -152,13 +155,19 @@ class Friday(Voice, History):
 
                     log.debug(f"tool response -> {result}")
 
-                    self.add_message(
-                        result["content"], 
-                        role="tool", 
-                        images=result.get("images"),
-                        audio=result.get("audio"),
-                        tool_name=name
-                    )
+                    if result is None: # If function did not return anything
+                        result = "Sucess"
+
+                    if isinstance(result, str):
+                        self.add_message(result, role="tool", tool_name=name)
+                    else:
+                        self.add_message(
+                            result["content"], 
+                            role="tool", 
+                            images=result.get("images"),
+                            audio=result.get("audio"),
+                            tool_name=name
+                        )                        
 
             except ollama.ResponseError as e:
                 # So, this is a big workaround, for our shitty rolling single chat aproach

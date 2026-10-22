@@ -27,14 +27,19 @@ class FridayClient:
 
         return response
 
-    def __get_stream(self, con: BinaryIO):
-        while True:
-            response = self.__get_response(con)
+    def __get_stream(
+        self, 
+        request: dict
+    ) -> Generator[tuple[str, str]]:
+        with self.connection() as con:
+            self.__send_json(request, con)
+            while True:
+                response = self.__get_response(con)
 
-            if response["type"] == "done":
-                return
+                if response["type"] == "done":
+                    return
 
-            yield response["type"], response["chunk"]
+                yield response["type"], response["chunk"]
 
     def reply(
         self,
@@ -49,33 +54,35 @@ class FridayClient:
         if audio:
             audio = [os.path.realpath(a) for a in audio]
 
-        with self.connection() as con:
-            self.__send_json({ 
-                "function": "reply", 
-                "prompt": prompt,
-                "images": images,
-                "audio": audio,
-                "stream": stream
-            }, con)
+        request = { 
+            "function": "reply", 
+            "prompt": prompt,
+            "images": images,
+            "audio": audio,
+            "stream": stream
+        }
 
-            if stream:
-                return self.__get_stream(con)
-            
+        if stream:
+            return self.__get_stream(request)
+
+        with self.connection() as con:
+            self.__send_json(request, con)
             return self.__get_response(con).get("response")
 
     def converse(
         self, 
         stream: bool = True
     ) -> Generator[tuple[str, str]] | str:
-        with self.connection() as con:
-            self.__send_json({
-                "function": "converse",
-                "stream": stream
-            }, con)
+        request = {
+            "function": "converse",
+            "stream": stream
+        }
 
-            if stream:
-                return self.__get_stream(con)
-            
+        if stream:
+            return self.__get_stream(request)
+
+        with self.connection() as con:
+            self.__send_json(request, con)
             return self.__get_response(con).get("response")
 
     def shut_up(self):
@@ -98,11 +105,16 @@ class FridayClient:
             self.__get_response(con) 
 
     def listen(self):
-        with self._connection() as con:
-            self._send_json({"function": "listen"}, con)
+        with self.connection() as con:
+            self.__send_json({"function": "listen"}, con)
             self.__get_response(con)
 
     def done_listening(self) -> str:
-        with self._connection() as con:
-            self._send_json({"function": "done_listening"}, con)
+        with self.connection() as con:
+            self.__send_json({"function": "done_listening"}, con)
             return self.__get_response(con).get("response")
+
+    def get_messages(self) -> dict:
+        with self.connection() as con:
+            self.__send_json({"function": "get_messages"}, con)
+            return self.__get_response(con).get("response") 

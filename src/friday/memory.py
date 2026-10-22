@@ -26,7 +26,7 @@ class Turn:
     tokens: Optional[int] = None
     is_completed: bool = False
 
-class History:
+class Memory:
     def __init__(self, context_total: int):
         self.context_used = 0
         self.context_total = context_total
@@ -55,7 +55,10 @@ class History:
             db.add_message_entry(message["role"], message["content"])
 
     def get_messages(self, system_prompts: bool = True):
-        out = list(self._system_prompts)
+        if system_prompts:
+            out = list(self._system_prompts)
+        else:
+            out = []
         
         for turn in self._turns:
             out.extend(turn.messages)
@@ -135,10 +138,21 @@ class History:
         self._current_turn.is_completed = True
         self._current_turn = None
 
-    def wipe_context(self):
-        log.info("Wiping current turns history")        
+    def wipe_context(self, soft: bool = False):
+        log.info("Wiping current context")
+
+        if soft:
+            self._turns = self._turns[-1:]
+            return 
+        
         self._turns = []
         self._current_turn = None
+
+    def clean_memory(self):
+        """
+        Forget current messages history / context
+        """
+        self.wipe_context(soft=True)
 
     def unstage_turn(self):
         if self._current_turn is None:

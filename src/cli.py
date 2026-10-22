@@ -67,6 +67,9 @@ class CLI:
         print()
 
     def chat(self):
+        # print(self.fr.get_messages())
+        # exit(0)
+
         while True:
             try:
                 prompt = input(">> ")

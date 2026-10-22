@@ -58,6 +58,7 @@ class FridayServer(socketserver.StreamRequestHandler):
             case "wipe_context":   self.__response(self.server.fr.wipe_context())
             case "listen":         self.__response(self.server.fr.listen())
             case "done_listening": self.__response(self.server.fr.done_listening())
+            case "get_messages":   self.__response(self.server.fr.get_messages(False))
 
             case "converse":
                 if req.get("stream"):
