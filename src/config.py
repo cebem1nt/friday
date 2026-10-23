@@ -33,15 +33,12 @@ def get(group: str, opt: str, _type=str):
     if _config is None:
         parse()
     
-    try:
-        value = _config[group][opt]
-        if _type == bool:
-            value = value.strip().lower()
-            
-            if value == "true":
-                return True
-            return False
+    value = _config[group][opt]
+    if _type == bool:
+        value = value.strip().lower()
+        
+        if value == "true":
+            return True
+        return False
 
-        return _type(_config[group][opt])
-    except:
-        return None
+    return _type(_config[group][opt])

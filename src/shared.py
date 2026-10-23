@@ -11,39 +11,10 @@ LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
 # TODO pack these icons with friday (if it's okay)
 FRIDAY_ICONS = [f"si-syncthing-{n}" for n in range(1, 12)]
 
-# TODO this is english only 
 THINKING_QUOTES = [
-    "Processing your request",
-    "I gotta think on a response",
-    "Let my brain work a little",
-    "Let me think",
-    "Let me think about it",
-    "I should think about it",
-    "I'm thinking",
-    "Okay, let me think for a moment",
-    "Thinking",
-    "I have to think about it",
-    "Wait please, I gotta think",
-    "Give me a second to think",
-    "Let me put my thoughts together",
-    "Working through it",
-    "One moment while I think",
-    "Thinking it through",
-    "Let me mull that over",
-    "Gathering my thoughts",
-    "Hmm, let me think",
-    "Just a moment—I'm figuring it out",
-    "Let me work this out",
-    "Taking a moment to think",
-    "My gears are turning",
-    "Let's see... thinking",
-    "I'm piecing together an answer",
-    "Hold on, let me reason this out",
-    "Running that through my head",
-    "Give me a beat to think",
-    "I'm sorting through the details",
-    "Let me come up with a good answer",
-    "Hold on a second",
+    quote.strip()
+    for quote in config.get("misc", "thinking_quotes").split(";")
+        if quote.strip()
 ]
 
 class Database:
