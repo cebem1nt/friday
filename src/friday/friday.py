@@ -1,11 +1,11 @@
-from inspect import getmembers as igetmembers, isfunction as iisfunction
-
+from inspect import getmembers, isfunction
 from typing import Generator, Optional
 
 from src.friday.voice import Voice
 from src.friday.memory import Memory
-from src.friday import tools, common
-from src import config, log
+from src.friday import tools
+
+from src import config, log, shared
 
 import os, ollama, re
 
@@ -21,6 +21,8 @@ class Friday(Voice, Memory):
 
         arch = self.model_info.modelinfo.get("general.architecture")
         capabilities = self.model_info.capabilities
+        log.debug(f"capabilities: {capabilities}")
+
         supports_tools = "tools" in capabilities
         required_context_length = config.get("ai", "num_ctx")
 
@@ -36,11 +38,11 @@ class Friday(Voice, Memory):
 
         self.think = config.get("ai", "think", bool)
 
-        if not "think" in capabilities:
+        if not "thinking" in capabilities:
             log.info("Thinking is not supported by model")
             self.think = None
 
-        self.add_system_prompt(f"Date today: {common.today()}")
+        self.add_system_prompt(f"Date today: {shared.today()}")
 
         with open(SYSTEM_PROMPT) as f:
             self.add_system_prompt(f.read())
@@ -48,7 +50,7 @@ class Friday(Voice, Memory):
         if config.get("ai", "use_tools", bool) and supports_tools:
             self.tools = { 
                 name: func
-                for name, func in igetmembers(tools, iisfunction)
+                for name, func in getmembers(tools, isfunction)
                     if not name.startswith("__")
             }
 
@@ -205,7 +207,7 @@ class Friday(Voice, Memory):
 
             for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
                 if chunk_t == "thinking" and not is_thinking:
-                    self.say(common.random_thinking_quote())
+                    self.say(shared.random_thinking_quote())
                     is_thinking = True
 
                 if chunk_t == "response":
@@ -214,11 +216,11 @@ class Friday(Voice, Memory):
 
                 yield chunk_t, chunk
 
-            self.done_speaking()
+            self.done_speaking(generation)
             log.debug(f"context used: {self.context_used}/{self.context_total}")
             
             if notify_content:
-                common.notify("Reply from friday", output)
+                shared.notify("Reply from friday", output)
             
             return output
 

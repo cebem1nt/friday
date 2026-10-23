@@ -10,7 +10,7 @@ CONFIG_PATHS = [
 
 _config = None
 
-def _populate_config():
+def parse():
     global _config
 
     parser = ConfigParser(
@@ -31,7 +31,7 @@ def _populate_config():
 
 def get(group: str, opt: str, _type=str):
     if _config is None:
-        _populate_config()
+        parse()
     
     try:
         value = _config[group][opt]
@@ -45,10 +45,3 @@ def get(group: str, opt: str, _type=str):
         return _type(_config[group][opt])
     except:
         return None
-
-# TODO Hell yeah, im going to make friday be able to modify it's config at runtime
-def set(group: str, opt: str, value: Any):
-    if _config is None:
-        _populate_config()
-
-    _config[group][opt] = str(value)

@@ -2,13 +2,16 @@ from datetime import datetime
 from contextlib import contextmanager, closing
 from src import config
 
-import random, os, sqlite3, subprocess
+import random, os, sqlite3, subprocess, sys, signal
 
-# This one definitely works with papirus icon theme
-FRIDAY_ICONS = [
-    f"si-syncthing-{n}" for n in range(1, 12)
-]
+SOCKET_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.sock")
+LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
 
+# From papirus icon theme
+# TODO pack these icons with friday (if it's okay)
+FRIDAY_ICONS = [f"si-syncthing-{n}" for n in range(1, 12)]
+
+# TODO this is english only 
 THINKING_QUOTES = [
     "Processing your request",
     "I gotta think on a response",
@@ -42,45 +45,6 @@ THINKING_QUOTES = [
     "Let me come up with a good answer",
     "Hold on a second",
 ]
-
-def random_thinking_quote():
-    return random.choice(THINKING_QUOTES)
-
-def today():
-    return datetime.today().strftime('%Y-%m-%d')
-
-def notify(message: str, details: str):
-    if not config.get("misc", "send_notifications", bool):
-        return
-
-    icon = random.choice(FRIDAY_ICONS)
-    subprocess.Popen([
-        "notify-send", message, details,
-            "-a", "friday", 
-            "-i", icon 
-    ])
-
-def parse_duration(value: str) -> float:
-    value = value.strip().lower()
-
-    if len(value) < 2:
-        raise ValueError("Use a number followed by s, m, or h")
-
-    unit = value[-1]
-    multipliers = { "s": 1, "m": 60, "h": 3600 }
-
-    if unit not in multipliers:
-        raise ValueError("Duration unit must be s, m, or h")
-
-    try:
-        amount = float(value[:-1].strip())
-    except ValueError:
-        raise ValueError("Invalid duration amount") from None
-
-    if amount < 0:
-        raise ValueError("Duration cannot be negative")
-
-    return amount * multipliers[unit]
 
 class Database:
     def __init__(self):
@@ -164,3 +128,67 @@ class Database:
         return results
 
 db = Database()
+
+def random_thinking_quote():
+    return random.choice(THINKING_QUOTES)
+
+def today():
+    return datetime.today().strftime('%Y-%m-%d')
+
+def notify(message: str, details: str):
+    if not config.get("misc", "send_notifications", bool):
+        return
+
+    icon = random.choice(FRIDAY_ICONS)
+    subprocess.Popen([
+        "notify-send", message, details,
+            "-a", "friday", 
+            "-i", icon 
+    ])
+
+def parse_duration(value: str) -> float:
+    value = value.strip().lower()
+
+    if len(value) < 2:
+        raise ValueError("Use a number followed by s, m, or h")
+
+    unit = value[-1]
+    multipliers = { "s": 1, "m": 60, "h": 3600 }
+
+    if unit not in multipliers:
+        raise ValueError("Duration unit must be s, m, or h")
+
+    try:
+        amount = float(value[:-1].strip())
+    except ValueError:
+        raise ValueError("Invalid duration amount") from None
+
+    if amount < 0:
+        raise ValueError("Duration cannot be negative")
+
+    return amount * multipliers[unit]
+
+def friday_server_is_running():
+    if not os.path.exists(LOCK_PATH):
+        return False
+
+    with open(LOCK_PATH) as f:
+        content = f.read()
+
+        try:
+            pid = int(content)
+            os.kill(pid, 0)
+            return True
+
+        except:
+            return False
+
+def friday_server_reload():
+    if not friday_server_is_running():
+        return print("Friday server is not running!", file=sys.stderr)
+
+    with open(LOCK_PATH) as f:
+        pid = int(f.read())
+        os.kill(pid, signal.SIGUSR1)
+
+    print("Reload signal was sent")

@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Callable, Optional
 
-from src.friday.common import parse_duration
+from src.shared import parse_duration
 from src import config, log
 
 import numpy as np
@@ -154,12 +154,14 @@ class Voice:
         if self.kokoro is not None and idle_for >= self.kokoro_unload_after:
             log.info("Unloading kokoro")
             self.kokoro = None
+            self.g2p = None
 
     def unload_whisper_if_idle(self):
         idle_for = time.monotonic() - self._whisper_last_used
 
         if self.whisper is not None and idle_for >= self.whisper_unload_after:
             log.info("Unloading whisper")
+            self.whisper.model.unload_model()
             self.whisper = None
 
     def say(self, text: str, generation: Optional[int] = None):
@@ -200,7 +202,7 @@ class Voice:
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
             self.say(sentence, generation)
 
-    def done_speaking(self):
+    def done_speaking(self, generation: int):
         """
         Flush any buffered text that doesn't end with punctuation.
         """
@@ -210,7 +212,8 @@ class Voice:
             self._speech_buffer = ""
 
         if text:
-            self._speech_executor.submit(self.__synthesize, text, self.generation)
+            log.debug(f"done_speaking: _speech_executor.submit({generation}) -> {text}")
+            self._speech_executor.submit(self.__synthesize, text, generation)
 
     def listen(self):
         with self._listen_lock:

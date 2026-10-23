@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.friday.common import db
+from src.shared import db
 from src import log, config
 
 def estimate_tokens(messages: list[dict]):
@@ -20,7 +20,7 @@ def estimate_tokens(messages: list[dict]):
     return (text // 3) + media
 
 
-@dataclass
+@dataclass(slots=True)
 class Turn:
     messages: list[dict] = field(default_factory=list)
     tokens: Optional[int] = None

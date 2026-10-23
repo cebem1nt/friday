@@ -1,10 +1,8 @@
 import socket, os, json
 from contextlib import contextmanager
 
+from src.shared import SOCKET_PATH
 from typing import Any, BinaryIO, Optional, Generator
-
-SOCKET_PATH = os.path.join(
-    os.environ["XDG_RUNTIME_DIR"], "friday.sock")
 
 class FridayClient:
     @contextmanager

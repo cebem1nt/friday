@@ -1,22 +1,38 @@
-import os, json, socketserver, sys, socket, time
 from typing import Any, Generator, Optional
 
-from src import log
+from src.shared import SOCKET_PATH, LOCK_PATH, friday_server_is_running
+from src import log, config
 
-SOCKET_PATH = os.path.join(
-    os.environ["XDG_RUNTIME_DIR"], "friday.sock")
+import os, json, socketserver, sys, socket, time, signal, threading
 
 class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
     def __init__(self, *args, task_interval: int = 60, **kwargs):
         super().__init__(*args, **kwargs)
         log.info("Importing Friday, ollama...")
-
         from src.friday.friday import Friday
         self.fr = Friday()
+        self._Friday = Friday
         self.task_interval = task_interval
+
         self._next_task = time.monotonic() + task_interval
+        self._reload_requested = threading.Event()
+
+    def request_reload(self):
+        log.info("Got reload request")
+        self._reload_requested.set()
 
     def service_actions(self):
+        if self._reload_requested.is_set():
+            self._reload_requested.clear()
+            
+            try:
+                config.parse()
+                self.fr = self._Friday()
+                log.info("Friday reloaded")
+
+            except Exception:
+                log.error("Failed to reload!")
+        
         if time.monotonic() < self._next_task:
             return
 
@@ -100,26 +116,29 @@ class FridayServer(socketserver.StreamRequestHandler):
                 self.__response_error(f"internal error: {exc}")
                 raise exc
 
-def friday_server_is_running():
-    if not os.path.exists(SOCKET_PATH):
-        return False
-
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
-        try:
-            probe.connect(SOCKET_PATH)
-            return True
-        except:
-            if os.path.exists(SOCKET_PATH):
-                os.unlink(SOCKET_PATH)
-            return False
-
-def friday_serve():
+def serve():
     if friday_server_is_running():
         print("Friday server is allready running!", file=sys.stderr)
         exit(1)        
 
+    with open(LOCK_PATH, "w") as f:
+        f.write(str(os.getpid()))
+
+    if os.path.exists(SOCKET_PATH):
+        os.unlink(SOCKET_PATH)
+        
     with FridayThreadingUnixStreamServer(SOCKET_PATH, FridayServer) as server:
         os.chmod(SOCKET_PATH, 0o600)        
         os.chdir(os.getenv("HOME"))
+
+        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+        signal.signal(signal.SIGUSR1, lambda signum, frame: server.request_reload())
+
         log.info(f"Ready on {SOCKET_PATH}")
-        server.serve_forever()
+
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            exit(0)
+        finally:
+            os.unlink(SOCKET_PATH)

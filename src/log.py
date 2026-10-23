@@ -6,7 +6,7 @@ def set_log_level(lvl: int):
 
 def debug(msg: str):
     if _log_level > 3:
-        print(f"[\x1B[0;35mDEBUG\x1B[0m] {msg}")
+        print(f"[\x1B[0;35mDEBUG\x1B[0m] {msg}", flush=True)
 
 def info(msg: str):
     if _log_level > 2:

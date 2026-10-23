@@ -1,21 +1,19 @@
 from typing import Optional, Any
+from src import config, shared
 
-from src.friday import common
-from src import config
-
-import ollama, subprocess, os, shutil, fnmatch
+import subprocess, os, shutil, fnmatch
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 
 APP_TYPES = {
     "browser":      ("x-scheme-handler/https", "x-scheme-handler/http"),
-    "file_manager": ("inode/directory",),
-    "pdf_viewer":   ("application/pdf",),
-    "text_editor":  ("text/plain",),
-    "image_viewer": ("image/png",),
-    "video_player": ("video/mp4",),
-    "audio_player": ("audio/mpeg",),
-    "email_client": ("x-scheme-handler/mailto",),
+    "file_manager": ("inode/directory"),
+    "pdf_viewer":   ("application/pdf"),
+    "text_editor":  ("text/plain"),
+    "image_viewer": ("image/png"),
+    "video_player": ("video/mp4"),
+    "audio_player": ("audio/mpeg"),
+    "email_client": ("x-scheme-handler/mailto")
 }
 
 def __run(args: list[str]):
@@ -82,6 +80,8 @@ if WEB_SEARCH_PROVIDER == "ddgs":
         return __(DDGS().extract(url))
 
 elif WEB_SEARCH_PROVIDER == "ollama":
+    import ollama
+
     if not os.getenv("OLLAMA_API_KEY"):
         raise AssertionError("OLLAMA_API_KEY should be set in order to use ollama web search")
 
@@ -140,10 +140,18 @@ elif WEB_SEARCH_PROVIDER == "searxng":
         return __(text or "")
 
 def run_messages_history_sql(sql: str):
-    return __(common.db.run_sql(sql))
+    return __(shared.db.run_sql(sql))
 
+# TODO some content may overflow context
+# we can return something like "too big response" in such case
+# and model can run a command that returns less things  
 def run_cmd(cmd: str):
-    return __(__run_shell(cmd))
+    out = __run_shell(cmd)
+    return __({
+        "returncode": out.returncode, 
+        "stdout": out.stdout, 
+        "stderr": out.stderr
+    })
 
 def open_web_browser():
     __popen(["gtk-launch", __query_default("browser")])

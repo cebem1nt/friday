@@ -1,8 +1,9 @@
 import os, readline, random, sys, termios
 
+from contextlib import contextmanager
 from src import config
 from src.ipc.client import FridayClient
-from contextlib import contextmanager
+from src.shared import friday_server_is_running
 
 try:
     if not config.get("misc", "rich_formatting", bool):
@@ -67,8 +68,19 @@ class CLI:
         print()
 
     def chat(self):
-        # print(self.fr.get_messages())
-        # exit(0)
+        if not friday_server_is_running():
+            return print("Friday server is not running", file=sys.stderr)
+
+        messages = self.fr.get_messages()
+
+        for message in messages:
+            role = message["role"]
+            content = message["content"]
+
+            if role == "user":
+                print(f">> {content}")
+            elif role != "tool":
+                print(content)
 
         while True:
             try:
