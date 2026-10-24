@@ -32,6 +32,14 @@ def __run(args: list[str]):
         check=False
     )
 
+def __popen(args: list[str]):
+    return subprocess.Popen(
+        args,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
 def __run_shell(cmd: str):
     return subprocess.run(
         cmd,
@@ -41,7 +49,7 @@ def __run_shell(cmd: str):
         shell=True
     )
 
-def __popen(cmd: str):
+def __popen_shell(cmd: str):
     return subprocess.Popen(
         cmd, 
         stdin=subprocess.PIPE,
@@ -162,11 +170,9 @@ elif WEB_SEARCH_PROVIDER == "searxng":
 def run_messages_history_sql(sql: str):
     return __(shared.db.run_sql(sql))
 
-# TODO some content may overflow context
-# we can return something like "too big response" in such case
-# and model can run a command that returns less things  
-def run_cmd(cmd: str):
+def run_shell(cmd: str):
     out = __run_shell(cmd)
+
     return __({
         "returncode": out.returncode, 
         "stdout": out.stdout, 
@@ -177,7 +183,7 @@ def xdg_open(uri: str):
     """
     Open a file path or URL with its default desktop app.
     """
-    __popen(f"xdg-open {uri}")
+    __popen_shell(f"xdg-open {uri}")
     return __(f"{uri} was opened sucessfully!")
 
 def get_user_selection():
