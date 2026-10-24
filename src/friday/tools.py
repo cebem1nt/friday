@@ -4,6 +4,14 @@ from src import config, shared
 import subprocess, os, shutil, fnmatch
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
+MAX_LEN = config.get("misc", "max_tool_response_length")
+
+if MAX_LEN.lower() == "unlimited":
+    MAX_LEN = float('inf')
+else:
+    MAX_LEN = int(MAX_LEN)
+
+TRIM_CONTENT = config.get("misc", "max_response_trim_content", bool)
 
 APP_TYPES = {
     "browser":      ("x-scheme-handler/https", "x-scheme-handler/http"),
@@ -33,12 +41,13 @@ def __run_shell(cmd: str):
         shell=True
     )
 
-def __popen(args: list[str]):
+def __popen(cmd: str):
     return subprocess.Popen(
-        args, 
+        cmd, 
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        shell=True
     )
 
 def __query_default(app: str) -> Optional[str]:
@@ -59,10 +68,21 @@ def __(
     images: Optional[list[str]] = None, 
     audio: Optional[list[str]] = None
 ) -> dict:
-    out = { "content": str(content) }
+    content = str(content)
+
+    if len(content) > MAX_LEN:
+        if TRIM_CONTENT:
+            content = content[:max_len] + "..."
+        else:
+            content = "Too big response, try shorter request!"
+
+    out = { "content": content }
     
-    if images: out["images"] = images
-    if audio:  out["audio"] = audio
+    if images: 
+        out["images"] = images
+    
+    if audio:
+        out["audio"] = audio
 
     return out
 
@@ -153,19 +173,11 @@ def run_cmd(cmd: str):
         "stderr": out.stderr
     })
 
-def open_web_browser():
-    __popen(["gtk-launch", __query_default("browser")])
-    return __("Web browser launched successfully!")
-
-def open_file_manager():
-    __popen(["gtk-launch", __query_default("file_manager")])
-    return __("File manager launched successfully!")
-
 def xdg_open(uri: str):
     """
     Open a file path or URL with its default desktop app.
     """
-    __popen(["xdg-open", uri])
+    __popen(f"xdg-open {uri}")
     return __(f"{uri} was opened sucessfully!")
 
 def get_user_selection():

@@ -111,8 +111,12 @@ class FridayServer(socketserver.StreamRequestHandler):
                 if not self.__match_request(request):
                     log.warn(f"Unknown function: {request.get('function')}")
                     self.__response_error("unknown request function")
-                
+            
+            except BrokenPipeError:
+                self.server.fr.unstage_turn()
+
             except Exception as exc:
+                self.server.fr.unstage_turn()
                 self.__response_error(f"internal error: {exc}")
                 raise exc
 

@@ -6,6 +6,7 @@ from src.friday.memory import Memory
 from src.friday import tools
 
 from src import config, log, shared
+from pprint import pformat
 
 import os, ollama, re
 
@@ -65,10 +66,10 @@ class Friday(Voice, Memory):
                 "Use get_user_selection to get content from clipboard. "
                 "User might refer to selected content as \"this *\" or \"the selection\". It may return text, a directory, path, or a URL. \n"
 
-                "Use run_messages_history_sql to execute sql in your chat history database. You can run any sql you think is needed."
-                "DB has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
+                "Use run_messages_history_sql to execute sql in your history database. You can run any sql you think is needed."
+                "DB (sqlite) has: message(id, timestamp, role, content), tag(name), message_tags(message_id, tag_name). "
                 "Tags help you find messages later, tag can be: PERSONAL, PREFERENCE, INTEREST, ROUTINE, WORK "
-                "If user asks you to remember something, you either tag an existing message or create a new one and tag it."
+                "If user asks you to remember something, you either tag an existing message or create a new one and tag it. "
             ))
 
             if config.get("misc", "web_search_provider") == "none":
@@ -82,7 +83,7 @@ class Friday(Voice, Memory):
                     "Cite web-result URLs when you use them."
                 ))
                 
-            log.debug(f"tools: {self.tools}")
+            log.debug(f"tools: {pformat(self.tools, 2)}")
 
         elif supports_tools:
             log.warn("Tools aren't supported by the model")
