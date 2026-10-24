@@ -73,7 +73,7 @@ class Voice:
         log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
         self._output_lock = threading.Lock()
-        
+
         self._kokoro_last_used = time.monotonic()
         self._whisper_last_used = time.monotonic()
         self._listen_future: Optional[Future] = None
@@ -133,7 +133,7 @@ class Voice:
                 return
 
             audio = np.asarray(samples, dtype=np.float32).reshape(-1)
-            chunk_frames = 960
+            chunk_frames = 960 # 40ms
 
             for start in range(0, len(audio), chunk_frames):
                 chunk = audio[start:start + chunk_frames]

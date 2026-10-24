@@ -8,7 +8,7 @@ from src.friday import tools
 from src import config, log, shared
 from pprint import pformat
 
-import os, ollama, re
+import os, ollama, re, threading
 
 SYSTEM_PROMPT = os.path.expanduser("~/.config/friday/system_prompt.md")
 
@@ -38,6 +38,7 @@ class Friday(Voice, Memory):
         log.info("Friday: setting up Friday...")
 
         self.think = config.get("ai", "think", bool)
+        self.reply_lock = threading.Lock()
 
         if not "thinking" in capabilities:
             log.info("Thinking is not supported by model")
@@ -203,27 +204,28 @@ class Friday(Voice, Memory):
         generation = self.generation
 
         def generator():
-            is_thinking = False
-            output = ""
+            with self.reply_lock:
+                is_thinking = False
+                output = ""
 
-            for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
-                if chunk_t == "thinking" and not is_thinking:
-                    self.say(shared.random_thinking_quote())
-                    is_thinking = True
+                for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
+                    if chunk_t == "thinking" and not is_thinking:
+                        self.say(shared.random_thinking_quote())
+                        is_thinking = True
 
-                if chunk_t == "response":
-                    self.speak(chunk, generation)
-                    output += chunk
+                    if chunk_t == "response":
+                        self.speak(chunk, generation)
+                        output += chunk
 
-                yield chunk_t, chunk
+                    yield chunk_t, chunk
 
-            self.done_speaking(generation)
-            log.debug(f"context used: {self.context_used}/{self.context_total}")
-            
-            if notify_content:
-                shared.notify("Reply from friday", output)
-            
-            return output
+                self.done_speaking(generation)
+                log.debug(f"context used: {self.context_used}/{self.context_total}")
+                
+                if notify_content:
+                    shared.notify("Reply from friday", output)
+                
+                return output
 
         gen = generator()
 
