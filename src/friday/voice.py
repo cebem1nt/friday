@@ -41,12 +41,12 @@ def record_audio(
 class Voice:
     def __init__(self):    
         self._speech_buffer = ""
-        self._buffer_lock = threading.Lock()
         self._speech_executor = ThreadPoolExecutor(max_workers=1)
 
         # Audio chunks are tagged with a generation number. stop_speaking()
         # changes the generation, making old queued chunks invalid.
         self.generation = 0
+        self.is_speaking = False
 
         self.kokoro = None
         self.whisper = None
@@ -62,7 +62,6 @@ class Voice:
 
         if config.get("stt", "pre_allocate", bool):
             self.__init_whisper()
-
         log.info("VoiceProvider: Setting up sd.RawOutputStream...")
         import sounddevice as sd
         self._output_stream = sd.RawOutputStream(
@@ -73,11 +72,10 @@ class Voice:
 
         log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
+        self._output_lock = threading.Lock()
         
         self._kokoro_last_used = time.monotonic()
         self._whisper_last_used = time.monotonic()
-        self._stream_lock = threading.Lock()
-        self._listen_lock = threading.Lock()
         self._listen_future: Optional[Future] = None
         self._stop_recording: Optional[Callable] = None
 
@@ -134,12 +132,19 @@ class Voice:
             if generation != self.generation:
                 return
 
-            with self._stream_lock:
-                if generation != self.generation:
-                    return
+            audio = np.asarray(samples, dtype=np.float32).reshape(-1)
+            chunk_frames = 960
 
-                self._output_stream.write(samples.tobytes())
-                
+            for start in range(0, len(audio), chunk_frames):
+                chunk = audio[start:start + chunk_frames]
+
+                with self._output_lock:
+                    if generation != self.generation:
+                        return
+
+                    if self._output_stream.active:
+                        self._output_stream.write(chunk.tobytes())
+            
         except sd.PortAudioError:
             if generation != self.generation:
                 return
@@ -175,25 +180,25 @@ class Voice:
             self.__init_kokoro()
 
         self._speech_executor.submit(
-            self.__synthesize, text, self.generation)
+            self.__synthesize, text, generation)
 
     def speak(self, text: str, generation: int):
         """
         Buffered -> stores pieces and says as the whole sentence arrives
         needs done_speaking() when finished        
         """
-        
+
         sentences = []
 
-        with self._buffer_lock:
-            self._speech_buffer += text
+        self.is_speaking = True
+        self._speech_buffer += text
 
-            while match := re.search(r"[.!?:]\s+", self._speech_buffer):
-                sentence = self._speech_buffer[:match.end()].strip()
-                self._speech_buffer = self._speech_buffer[match.end():]
+        while match := re.search(r"[.!?:]\s+", self._speech_buffer):
+            sentence = self._speech_buffer[:match.end()].strip()
+            self._speech_buffer = self._speech_buffer[match.end():]
 
-                if sentence:
-                    sentences.append(sentence)
+            if sentence:
+                sentences.append(sentence)
 
         for sentence in sentences:
             if self.generation != generation:
@@ -202,50 +207,57 @@ class Voice:
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
             self.say(sentence, generation)
 
+    def __finish_speaking(self, generation: int):
+        if generation == self.generation:
+            self.is_speaking = False
+
     def done_speaking(self, generation: int):
         """
         Flush any buffered text that doesn't end with punctuation.
         """
         
-        with self._buffer_lock:
-            text = self._speech_buffer.strip()
-            self._speech_buffer = ""
+        text = self._speech_buffer.strip()
+        self._speech_buffer = ""
 
         if text:
-            log.debug(f"done_speaking: _speech_executor.submit({generation}) -> {text}")
             self._speech_executor.submit(self.__synthesize, text, generation)
+            log.debug(f"done_speaking: _speech_executor.submit({generation}) -> {text}")
+
+        self._speech_executor.submit(self.__finish_speaking, generation)
 
     def listen(self):
-        with self._listen_lock:
-            if self.is_listening():
-                raise RuntimeError("Already listening.")
+        if self.is_listening():
+            raise RuntimeError("Already listening.")
 
-            self._listen_future, self._stop_recording = record_audio()
+        self._listen_future, self._stop_recording = record_audio()
 
     def done_listening(self) -> str:
-        with self._listen_lock:
-            if not self.is_listening():
-                raise RuntimeError("Not currently listening.")
+        if not self.is_listening():
+            raise RuntimeError("Not currently listening.")
 
-            future = self._listen_future
-            self._stop_recording()
+        future = self._listen_future
+        self._stop_recording()
 
-            try:
-                audio = future.result()
-                return self.transcribe(audio)
-            finally:
-                self._listen_future = None
-                self._stop_recording = None
+        try:
+            audio = future.result()
+            return self.transcribe(audio)
+        finally:
+            self._listen_future = None
+            self._stop_recording = None
 
     def shut_up(self):
-        with self._buffer_lock:
-            self.generation += 1
-            log.debug(f"shifted self.generation = {self.generation}")
-            self._speech_buffer = ""
+        if not self.is_speaking:
+            return
 
-        with self._stream_lock:
-            pass
-        
+        self.generation += 1
+        self.is_speaking = False
+        self._speech_buffer = ""
+
+        with self._output_lock:
+            self._output_stream.abort()
+            if not self._output_stream.active:
+                self._output_stream.start()
+
     def transcribe(self, audio: np.ndarray):
         if self.whisper is None:
             self.__init_whisper()

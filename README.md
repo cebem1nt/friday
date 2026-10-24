@@ -1,9 +1,6 @@
 # friday
 
-Fully local linux AI assistant infrastructure built on top of ollama.
-
-> [!WARNING]
-> Work in progress, some things might not work correctly
+Fully local linux AI assistant built on top of `ollama`.
 
 ## Installation 
 
