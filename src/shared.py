@@ -35,18 +35,9 @@ class Database:
             """)
 
             con.execute("""
-                CREATE TABLE IF NOT EXISTS tag (
-                    name TEXT PRIMARY KEY
-                )
-            """)
-
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS message_tags (
-                    message_id INTEGER NOT NULL,
-                    tag_name TEXT NOT NULL,
-                    PRIMARY KEY (message_id, tag_name),
-                    FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE,
-                    FOREIGN KEY (tag_name) REFERENCES tag(name) ON DELETE CASCADE
+                CREATE TABLE IF NOT EXISTS setting (
+                    id INTEGER PRIMARY KEY,
+                    content TEXT NOT NULL
                 )
             """)
 
