@@ -290,6 +290,9 @@ def write_to_file(
     return f"Content was written to {path}"
 
 def change_directory(directory: str):
+    directory = os.path.expanduser(
+        os.path.expandvars(directory))
+
     if not os.path.exists(directory):
         return "Directory does not exist"
 

@@ -9,8 +9,7 @@ if __name__ == "__main__":
     subparsers = p.add_subparsers(dest="command", help="available commands")
 
     serve_p = subparsers.add_parser("serve", help="start friday IPC server")
-    serve_p.add_argument("-l", "--log-level", type=int, default=2, 
-        help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
+    serve_p.add_argument("-l", "--log-level", type=int, default=2, help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
 
     p.add_argument("-c", "--converse",    action="store_true", help="start recording audio, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",        action="store_true", help="wipe current friday context")

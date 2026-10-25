@@ -79,6 +79,9 @@ class Voice:
         self._listen_future: Optional[Future] = None
         self._stop_recording: Optional[Callable] = None
 
+        self._in_code_block = False
+        self._code_fence_pending = ""
+
     def __init_whisper(self):
         log.info("VoiceProvider: Setting up whisper...")
         from faster_whisper import WhisperModel
@@ -157,6 +160,28 @@ class Voice:
         if generation == self.generation:
             self.is_speaking = False
 
+    def __remove_code_blocks(self, text: str) -> str:
+        data = self._code_fence_pending + text
+        self._code_fence_pending = ""
+        output = []
+        i = 0
+
+        while i < len(data):
+            if data.startswith("```", i):
+                self._in_code_block = not self._in_code_block
+                i += 3
+                continue
+
+            if data[i] == "`" and len(data) - i < 3:
+                self._code_fence_pending = data[i:]
+                break
+
+            if not self._in_code_block:
+                output.append(data[i])
+            i += 1
+
+        return "".join(output)
+
     def unload_kokoro_if_idle(self):
         idle_for = time.monotonic() - self._kokoro_last_used
         
@@ -195,9 +220,11 @@ class Voice:
         sentences = []
 
         self.is_speaking = True
-        self._speech_buffer += text
+        self._speech_buffer += self.__remove_code_blocks(text)
+        self._speech_buffer = self._speech_buffer.replace("**", "")
+        self._speech_buffer = self._speech_buffer.replace("#", "")
 
-        while match := re.search(r"[.!?:]\s+", self._speech_buffer):
+        while match := re.search(r"[.!?:]\s+|\n+", self._speech_buffer):
             sentence = self._speech_buffer[:match.end()].strip()
             self._speech_buffer = self._speech_buffer[match.end():]
 
@@ -205,9 +232,6 @@ class Voice:
                 sentences.append(sentence)
 
         for sentence in sentences:
-            if self.generation != generation:
-                return
-
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
             self.say(sentence, generation)
 
