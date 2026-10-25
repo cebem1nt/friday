@@ -78,11 +78,11 @@ def __(
 ) -> dict:
     content = str(content)
 
-    if len(content) > MAX_LEN:
+    if (length := len(content)) > MAX_LEN:
         if TRIM_CONTENT:
-            content = content[:max_len] + "..."
+            content = content[:MAX_LEN] + "..."
         else:
-            content = "Too big response, try shorter request!"
+            content = f"Too big response ({length}), try shorter request!"
 
     out = { "content": content }
     
@@ -97,7 +97,7 @@ def __(
 if WEB_SEARCH_PROVIDER == "ddgs":
     from ddgs import DDGS
 
-    def web_search(query: str, max_results: int = 3):
+    def web_search(query: str, max_results: int = 5):
         return __(DDGS().text(query, max_results=max_results))
 
     def web_fetch(url: str):
@@ -179,6 +179,13 @@ def run_shell(cmd: str):
         "stderr": out.stderr
     })
 
+def spawn_process(cmd: list[str]):
+    try:
+        __popen(cmd)
+        return "Process spawned"
+    except:
+        return "Could not spawn process!"
+
 def xdg_open(uri: str):
     """
     Open a file path or URL with its default desktop app.
@@ -208,6 +215,36 @@ def get_user_selection():
 
     return "Could not read clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11)."
 
+def paste_to_user_selection(content: str):
+    if os.environ.get("WAYLAND_DISPLAY"): 
+        commands = [ 
+            ["wl-copy"] 
+        ] 
+    else: 
+        commands = [
+            ["xclip", "-selection", "clipboard"], 
+            ["xsel", "--clipboard"] 
+        ]
+
+    for command in commands:
+        if not shutil.which(command[0]):
+            continue
+
+        try:
+            result = subprocess.run(
+                command,
+                input=content,
+                text=True,
+                capture_output=True,
+            )
+        except OSError:
+            continue
+
+        if result.returncode == 0:
+            return "Successfully pasted to clipboard."
+
+    return "Could not paste to clipboard. Install wl-clipboard (Wayland) or xclip/xsel (X11)."
+
 def look_at_the_screen():
     """
     Take a screenshot of what's going on user's screen right now.
@@ -234,7 +271,11 @@ def read_file(path: str):
     except Exception as e:
         return f"Could not read file: {e}"
 
-def write_to_file(path: str, content: str, append_to_the_end: bool = False):
+def write_to_file(
+    path: str, 
+    content: str, 
+    append_to_the_end: bool = False
+):
     path = os.path.expanduser(
         os.path.expandvars(path))
 

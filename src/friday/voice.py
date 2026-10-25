@@ -153,6 +153,10 @@ class Voice:
         finally:
             self._kokoro_last_used = time.monotonic()
 
+    def __finish_speaking(self, generation: int):
+        if generation == self.generation:
+            self.is_speaking = False
+
     def unload_kokoro_if_idle(self):
         idle_for = time.monotonic() - self._kokoro_last_used
         
@@ -206,10 +210,6 @@ class Voice:
 
             log.debug(f"_speech_executor.submit({generation}) -> {sentence}")
             self.say(sentence, generation)
-
-    def __finish_speaking(self, generation: int):
-        if generation == self.generation:
-            self.is_speaking = False
 
     def done_speaking(self, generation: int):
         """
