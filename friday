@@ -10,6 +10,7 @@ if __name__ == "__main__":
 
     serve_p = subparsers.add_parser("serve", help="start friday IPC server")
     serve_p.add_argument("-l", "--log-level", type=int, default=2, help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
+    serve_p.add_argument("-f", "--log-file", help="duplicate logs to this file")
 
     p.add_argument("-c", "--converse",    action="store_true", help="start recording audio, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",        action="store_true", help="wipe current friday context")
@@ -23,6 +24,7 @@ if __name__ == "__main__":
     if args.command == "serve":
         from src.ipc.server import serve
         log.set_log_level(args.log_level)
+        log.set_log_file(args.log_file)
         serve()
         exit(0)
 

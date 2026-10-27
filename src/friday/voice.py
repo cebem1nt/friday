@@ -62,6 +62,7 @@ class Voice:
 
         if config.get("stt", "pre_allocate", bool):
             self.__init_whisper()
+
         log.info("VoiceProvider: Setting up sd.RawOutputStream...")
         import sounddevice as sd
         self._output_stream = sd.RawOutputStream(
@@ -92,6 +93,9 @@ class Voice:
 
         compute_type = "int8" if device == "cpu" else "float16" 
 
+        log.debug(f"__init_whisper: device -> {device}")
+        log.debug(f"__init_whisper: compute type -> {compute_type}")
+
         self.whisper = WhisperModel(
             config.get("stt", "model"),
             device=device,
@@ -102,6 +106,7 @@ class Voice:
         log.info("VoiceProvider: Setting up kokoro...")
 
         if config.get("tts", "prefer_cpu", bool):
+            log.debug("__init_kokoro: prefer_cpu is set, CPUExecutionProvider will be used")
             os.environ["ONNX_PROVIDER"] = "CPUExecutionProvider"
 
         from kokoro_onnx import Kokoro
@@ -110,6 +115,7 @@ class Voice:
         self.g2p = None
 
         if not self.language.startswith("en"):
+            log.debug("__init_kokoro: not english language, phonemizer will be used")
             from misaki.espeak import EspeakG2P
 
             self.g2p = EspeakG2P(language=self.language)

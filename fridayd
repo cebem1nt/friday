@@ -22,4 +22,9 @@ if [[ -e ".env" ]]; then
 fi
 
 source .venv/bin/activate
-./friday serve --log-level=4
+
+mkdir -p "$HOME/.cache/friday/"
+
+./friday serve \
+    --log-level=4 \
+    --log-file="$HOME/.cache/friday/friday.log"
