@@ -25,6 +25,6 @@ source .venv/bin/activate
 
 mkdir -p "$HOME/.cache/friday/"
 
-./friday serve \
-    --log-level=4 \
-    --log-file="$HOME/.cache/friday/friday.log"
+exec ./friday serve \
+        --log-level=4 \
+        --log-file="$HOME/.cache/friday/friday.log"

@@ -54,14 +54,24 @@ class Memory:
 
             db.add_message_entry(message["role"], message["content"])
 
-    def get_messages(self, system_prompts: bool = True):
+    def get_messages(
+        self, 
+        system_prompts: bool = True,
+        tool_calls: bool = True
+    ):
         if system_prompts:
             out = list(self._system_prompts)
         else:
             out = []
         
         for turn in self._turns:
-            out.extend(turn.messages)
+            messages = turn.messages
+
+            if not tool_calls:
+                not_tool_calls = lambda m: m["role"] != "tool" and (not m.get("tool_calls"))
+                messages = filter(not_tool_calls, messages)
+
+            out.extend(messages)
 
         return out
 

@@ -1,9 +1,13 @@
+import os, json, socketserver, sys, socket, time, signal, threading
+
 from typing import Any, Generator, Optional
 
-from src.shared import SOCKET_PATH, LOCK_PATH, friday_server_is_running
 from src import log, config
-
-import os, json, socketserver, sys, socket, time, signal, threading
+from src.shared import (
+    SOCKET_PATH, 
+    LOCK_PATH, 
+    friday_server_is_running
+)
 
 class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
     def __init__(self, *args, task_interval: int = 60, **kwargs):
@@ -36,9 +40,7 @@ class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
         if time.monotonic() < self._next_task:
             return
 
-        self.fr.unload_kokoro_if_idle()
-        self.fr.unload_whisper_if_idle()
-
+        self.fr.idle_actions()
         self._next_task = time.monotonic() + self.task_interval
 
 
@@ -74,7 +76,7 @@ class FridayServer(socketserver.StreamRequestHandler):
             case "wipe_context":   self.__response(self.server.fr.wipe_context())
             case "listen":         self.__response(self.server.fr.listen())
             case "done_listening": self.__response(self.server.fr.done_listening())
-            case "get_messages":   self.__response(self.server.fr.get_messages(False))
+            case "get_messages":   self.__response(self.server.fr.get_messages(False, False))
 
             case "converse":
                 if req.get("stream"):

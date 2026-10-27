@@ -3,6 +3,7 @@ from typing import Callable, Optional
 
 from src.shared import parse_duration
 from src import config, log
+from sounddevice import RawOutputStream
 
 import numpy as np
 import sounddevice as sd
@@ -38,89 +39,87 @@ def record_audio(
     threading.Thread(target=record, daemon=True).start()
     return future, stop_event.set
 
-class Voice:
-    def __init__(self):    
-        self._speech_buffer = ""
-        self._speech_executor = ThreadPoolExecutor(max_workers=1)
+class SpeechFilter:
+    def __init__(self):
+        self.in_code_block = False
+        self.pending_fence = ""
+
+    def apply(self, text: str):
+        out = self.remove_code_blocks(text)
+        out = out.replace("**", "")
+        out = out.replace("#", "")
+
+        return out
+
+    def remove_code_blocks(self, text: str):
+        data = self.pending_fence + text
+        self.pending_fence = ""
+        output = []
+        i = 0
+
+        while i < len(data):
+            if data.startswith("```", i):
+                self.in_code_block = not self.in_code_block
+                i += 3
+                continue
+
+            if data[i] == "`" and len(data) - i < 3:
+                self.pending_fence = data[i:]
+                break
+
+            if not self.in_code_block:
+                output.append(data[i])
+            i += 1
+
+        return "".join(output)
+
+class KokoroWrapper:
+    def __init__(self):
+        self.model = None
+        self.last_used = time.monotonic()
+        self.unload_after = config.get("tts", "unload_after", parse_duration)
+        self.language = config.get("tts", "language")
+        self.voice = config.get("tts", "voice")
+        self.speed = config.get("tts", "speed", float)
+
+        if config.get("tts", "pre_allocate", bool):
+            self.__init_model()
 
         # Audio chunks are tagged with a generation number. stop_speaking()
         # changes the generation, making old queued chunks invalid.
         self.generation = 0
         self.is_speaking = False
 
-        self.kokoro = None
-        self.whisper = None
-
-        self.kokoro_unload_after = config.get("tts", "unload_after", parse_duration)
-        self.whisper_unload_after = config.get("stt", "unload_after", parse_duration)
-
-        self.voice = config.get("tts", "voice")
-        self.speed = config.get("tts", "speed", float)
-
-        if config.get("tts", "pre_allocate", bool):
-            self.__init_kokoro()
-
-        if config.get("stt", "pre_allocate", bool):
-            self.__init_whisper()
-
-        log.info("VoiceProvider: Setting up sd.RawOutputStream...")
-        import sounddevice as sd
-        self._output_stream = sd.RawOutputStream(
+        self._speech_buffer = ""
+        self._speech_executor = ThreadPoolExecutor(max_workers=1)
+        
+        self._output_stream = RawOutputStream(
             samplerate=24000,
             channels=1,
             dtype="float32",
         )
 
-        log.info("VoiceProvider: Starting sd.RawOutputStream...")
         self._output_stream.start()
         self._output_lock = threading.Lock()
 
-        self._kokoro_last_used = time.monotonic()
-        self._whisper_last_used = time.monotonic()
-        self._listen_future: Optional[Future] = None
-        self._stop_recording: Optional[Callable] = None
-
-        self._in_code_block = False
-        self._code_fence_pending = ""
-
-    def __init_whisper(self):
-        log.info("VoiceProvider: Setting up whisper...")
-        from faster_whisper import WhisperModel
-
-        device = "auto"
-        if config.get("stt", "prefer_cpu", bool):
-            device = "cpu"
-
-        compute_type = "int8" if device == "cpu" else "float16" 
-
-        log.debug(f"__init_whisper: device -> {device}")
-        log.debug(f"__init_whisper: compute type -> {compute_type}")
-
-        self.whisper = WhisperModel(
-            config.get("stt", "model"),
-            device=device,
-            compute_type=compute_type,
-        )
-
-    def __init_kokoro(self):
-        log.info("VoiceProvider: Setting up kokoro...")
+    def __init_model(self):
+        log.info("Initializing kokoro...")
 
         if config.get("tts", "prefer_cpu", bool):
-            log.debug("__init_kokoro: prefer_cpu is set, CPUExecutionProvider will be used")
+            log.debug("KokoroWrapper: prefer_cpu is set, CPUExecutionProvider will be used")
             os.environ["ONNX_PROVIDER"] = "CPUExecutionProvider"
 
         from kokoro_onnx import Kokoro
 
-        self.language = config.get("tts", "language")
         self.g2p = None
 
         if not self.language.startswith("en"):
-            log.debug("__init_kokoro: not english language, phonemizer will be used")
+            log.debug("KokoroWrapper: not english language, phonemizer will be used")
             from misaki.espeak import EspeakG2P
 
             self.g2p = EspeakG2P(language=self.language)
 
-        self.kokoro = Kokoro(
+        self.model = Kokoro(
             model_path=config.get("tts", "model_path", os.path.expanduser),
             voices_path=config.get("tts", "voices_path", os.path.expanduser)
         )
@@ -132,10 +131,10 @@ class Voice:
         try:
             if self.g2p is not None:
                 phonemes, _ = self.g2p(text)
-                samples, _ = self.kokoro.create(
+                samples, _ = self.model.create(
                     phonemes, voice=self.voice, speed=self.speed, is_phonemes=True)
             else:
-                samples, _ = self.kokoro.create(
+                samples, _ = self.model.create(
                     text, voice=self.voice, speed=self.speed, lang=self.language)
 
             if generation != self.generation:
@@ -151,8 +150,7 @@ class Voice:
                     if generation != self.generation:
                         return
 
-                    if self._output_stream.active:
-                        self._output_stream.write(chunk.tobytes())
+                    self._output_stream.write(chunk.tobytes())
             
         except sd.PortAudioError:
             if generation != self.generation:
@@ -160,75 +158,38 @@ class Voice:
             raise
 
         finally:
-            self._kokoro_last_used = time.monotonic()
+            self.last_used = time.monotonic()
 
     def __finish_speaking(self, generation: int):
         if generation == self.generation:
             self.is_speaking = False
 
-    def __remove_code_blocks(self, text: str) -> str:
-        data = self._code_fence_pending + text
-        self._code_fence_pending = ""
-        output = []
-        i = 0
-
-        while i < len(data):
-            if data.startswith("```", i):
-                self._in_code_block = not self._in_code_block
-                i += 3
-                continue
-
-            if data[i] == "`" and len(data) - i < 3:
-                self._code_fence_pending = data[i:]
-                break
-
-            if not self._in_code_block:
-                output.append(data[i])
-            i += 1
-
-        return "".join(output)
-
-    def unload_kokoro_if_idle(self):
-        idle_for = time.monotonic() - self._kokoro_last_used
+    def unload_if_idle(self):
+        idle_for = time.monotonic() - self.last_used
         
-        if self.kokoro is not None and idle_for >= self.kokoro_unload_after:
+        if self.model is not None and idle_for >= self.unload_after:
             log.info("Unloading kokoro")
-            self.kokoro = None
+            self.model = None
             self.g2p = None
 
-    def unload_whisper_if_idle(self):
-        idle_for = time.monotonic() - self._whisper_last_used
-
-        if self.whisper is not None and idle_for >= self.whisper_unload_after:
-            log.info("Unloading whisper")
-            self.whisper.model.unload_model()
-            self.whisper = None
-
     def say(self, text: str, generation: Optional[int] = None):
-        """
-        Unbuffered -> gets text -> says it
-        """
         if generation is None:
             generation = self.generation
 
-        if self.kokoro is None:
-            self.__init_kokoro()
+        if self.model is None:
+            self.__init_model()
 
         self._speech_executor.submit(
             self.__synthesize, text, generation)
 
-    def speak(self, text: str, generation: int):
-        """
-        Buffered -> stores pieces and says as the whole sentence arrives
-        needs done_speaking() when finished        
-        """
-
+    def speak(self, text: str, generation: Optional[int] = None):
         sentences = []
 
         self.is_speaking = True
-        self._speech_buffer += self.__remove_code_blocks(text)
-        self._speech_buffer = self._speech_buffer.replace("**", "")
-        self._speech_buffer = self._speech_buffer.replace("#", "")
+        self._speech_buffer += text
+
+        if not generation:
+            generation = self.generation
 
         while match := re.search(r"[.!?:]\s+|\n+", self._speech_buffer):
             sentence = self._speech_buffer[:match.end()].strip()
@@ -242,10 +203,6 @@ class Voice:
             self.say(sentence, generation)
 
     def done_speaking(self, generation: int):
-        """
-        Flush any buffered text that doesn't end with punctuation.
-        """
-        
         text = self._speech_buffer.strip()
         self._speech_buffer = ""
 
@@ -254,26 +211,6 @@ class Voice:
             log.debug(f"done_speaking: _speech_executor.submit({generation}) -> {text}")
 
         self._speech_executor.submit(self.__finish_speaking, generation)
-
-    def listen(self):
-        if self.is_listening():
-            raise RuntimeError("Already listening.")
-
-        self._listen_future, self._stop_recording = record_audio()
-
-    def done_listening(self) -> str:
-        if not self.is_listening():
-            raise RuntimeError("Not currently listening.")
-
-        future = self._listen_future
-        self._stop_recording()
-
-        try:
-            audio = future.result()
-            return self.transcribe(audio)
-        finally:
-            self._listen_future = None
-            self._stop_recording = None
 
     def shut_up(self):
         if not self.is_speaking:
@@ -284,21 +221,124 @@ class Voice:
         self._speech_buffer = ""
 
         with self._output_lock:
-            self._output_stream.abort()
-            if not self._output_stream.active:
-                self._output_stream.start()
+            pass
+
+class WhisperWrapper:
+    def __init__(self):
+        self.model = None
+        self.unload_after = config.get("stt", "unload_after", parse_duration)
+        self.last_used = time.monotonic()
+
+        if config.get("stt", "pre_allocate", bool):
+            self.__init_model()
+
+    def __init_model(self):
+        log.info("Initializing whisper...")
+        from faster_whisper import WhisperModel
+
+        device = "auto"
+        if config.get("stt", "prefer_cpu", bool):
+            device = "cpu"
+
+        compute_type = "int8" if device == "cpu" else "float16" 
+
+        log.debug(f"WhisperWrapper: device -> {device}")
+        log.debug(f"WhisperWrapper: compute type -> {compute_type}")
+
+        self.model = WhisperModel(
+            config.get("stt", "model"),
+            device=device,
+            compute_type=compute_type,
+        )
+    
+    def unload_if_idle(self):
+        idle_for = time.monotonic() - self.last_used
+
+        if self.model is not None and idle_for >= self.unload_after:
+            log.info("Unloading whisper")
+            self.model.model.unload_model()
+            self.model = None
 
     def transcribe(self, audio: np.ndarray):
-        if self.whisper is None:
-            self.__init_whisper()
+        if self.model is None:
+            self.__init_model()
 
         try:
-            segments, info = self.whisper.transcribe(audio)
+            segments, info = self.model.transcribe(audio)
             out = "".join(segment.text for segment in segments).strip()
         finally:
-            self._whisper_last_used = time.monotonic()
+            self.last_used = time.monotonic()
 
         return out
+
+class Voice:
+    def __init__(self):    
+        self.filter = SpeechFilter()
+        self.kokoro = KokoroWrapper()
+        self.whisper = WhisperWrapper()
+
+        self._listen_future: Optional[Future] = None
+        self._stop_recording: Optional[Callable] = None
+
+    def transcribe(self, audio: np.ndarray):
+        return self.whisper.transcribe(audio)
+
+    def get_generation(self):
+        return self.kokoro.generation
+
+    def say(self, text: str):
+        """
+        Unbuffered -> gets text -> says it
+        """
+        text = self.filter.apply(text)
+        self.kokoro.say(text)
+
+    def speak(self, text: str, generation: int):
+        """
+        Buffered: stores pieces and says as the whole sentence arrives
+        needs done_speaking() when finished        
+        """
+
+        text = self.filter.apply(text)
+        self.kokoro.speak(text, generation)
+
+    def done_speaking(self, generation: int):
+        """
+        Flush any buffered text that doesn't end with punctuation.
+        """
+        self.kokoro.done_speaking(generation)
+
+    def shut_up(self):
+        self.kokoro.shut_up()
+
+    def listen(self):
+        """
+        Start recording user audio.
+        Call done_listening when done
+        """
+
+        if self.is_listening():
+            raise RuntimeError("Already listening.")
+
+        self._listen_future, self._stop_recording = record_audio()
+
+    def done_listening(self) -> str:
+        """
+        Finish audio input recording,
+        return transcribed text
+        """
+
+        if not self.is_listening():
+            raise RuntimeError("Not currently listening.")
+
+        self._stop_recording()
+
+        try:
+            audio = self._listen_future.result()
+            return self.transcribe(audio)
+        finally:
+            self._listen_future = None
+            self._stop_recording = None
 
     def is_listening(self):
         return self._listen_future is not None and self._stop_recording is not None

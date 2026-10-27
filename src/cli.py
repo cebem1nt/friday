@@ -79,7 +79,11 @@ class CLI:
 
             if role == "user":
                 print(f">> {content}")
-            elif role != "tool":
+                continue
+
+            if USE_RICH:
+                Console().print(Markdown(content))
+            else:
                 print(content)
 
         while True:
