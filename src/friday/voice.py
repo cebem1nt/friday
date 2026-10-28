@@ -46,7 +46,7 @@ class SpeechFilter:
 
     def apply(self, text: str):
         out = self.remove_code_blocks(text)
-        out = out.replace("**", "")
+        out = out.replace("*", "")
         out = out.replace("#", "")
 
         return out
@@ -82,7 +82,7 @@ class KokoroWrapper:
         self.voice = config.get("tts", "voice")
         self.speed = config.get("tts", "speed", float)
 
-        if config.get("tts", "pre_allocate", bool):
+        if config.get("tts", "preload", bool):
             self.__init_model()
 
         # Audio chunks are tagged with a generation number. stop_speaking()
@@ -229,7 +229,7 @@ class WhisperWrapper:
         self.unload_after = config.get("stt", "unload_after", parse_duration)
         self.last_used = time.monotonic()
 
-        if config.get("stt", "pre_allocate", bool):
+        if config.get("stt", "preload", bool):
             self.__init_model()
 
     def __init_model(self):
