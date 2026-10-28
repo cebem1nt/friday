@@ -7,7 +7,7 @@ from sounddevice import RawOutputStream
 
 import numpy as np
 import sounddevice as sd
-import re, os, threading, time
+import re, os, threading, time, gc
 
 def record_audio(
     samplerate: int = 16000, 
@@ -171,6 +171,7 @@ class KokoroWrapper:
             log.info("Unloading kokoro")
             self.model = None
             self.g2p = None
+            gc.collect()
 
     def say(self, text: str, generation: Optional[int] = None):
         if generation is None:
@@ -258,6 +259,7 @@ class WhisperWrapper:
             log.info("Unloading whisper")
             self.model.model.unload_model()
             self.model = None
+            gc.collect()
 
     def transcribe(self, audio: np.ndarray):
         if self.model is None:

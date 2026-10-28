@@ -98,6 +98,9 @@ if WEB_SEARCH_PROVIDER == "ddgs":
     from ddgs import DDGS
 
     def web_search(query: str, max_results: int = 5):
+        """
+        max_results should be >= 3
+        """
         return __(DDGS().text(query, max_results=max_results))
 
     def web_fetch(url: str):

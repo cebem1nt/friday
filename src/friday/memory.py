@@ -23,13 +23,6 @@ def estimate_tokens(messages: list[dict]):
 
     return (text // 3) + media
 
-
-# @dataclass(slots=True)
-# class Turn:
-#     messages: list[dict] = field(default_factory=list)
-#     tokens: Optional[int] = None
-#     is_completed: bool = False
-
 class Memory:
     def __init__(self, context_total: int):
         self.context_used = 0
@@ -66,15 +59,14 @@ class Memory:
 
             db.add_message_entry(message["role"], message["content"])
 
-    @property
-    def _turns(self) -> list[dict]:
+    def __get_turns(self) -> list[dict]:
         with open(self._turns_file) as f:
             out = json.load(f)
             self.turns_length = len(out)
             return out
 
     def __append_turn(self, turn: dict):
-        turns = self._turns
+        turns = self.__get_turns()
         turns.append(turn)
         self.turns_length += 1
 
@@ -82,7 +74,7 @@ class Memory:
             json.dump(turns, f)
 
     def __shift_turn(self):
-        turns = self._turns
+        turns = self.__get_turns()
         turns.pop(0)
         self.turns_length -= 1
 
@@ -99,7 +91,7 @@ class Memory:
         else:
             out = []
         
-        for turn in self._turns:
+        for turn in self.__get_turns():
             messages = turn["messages"]
 
             if not tool_calls:
@@ -159,14 +151,16 @@ class Memory:
 
     def prune(self):        
         removable = max(0, self.turns_length - self.keep_recent_turns)
+        turns = self.__get_turns()
 
         while self.context_used > self.context_target and (removable > 0):
-            oldest = self._turns[0]
+            oldest = turns[0]
 
             # This is an approximation
             self.context_used = max(0, self.context_used - oldest["tokens"])
 
             self.__shift_turn()
+            turns.pop(0)
             removable -= 1
 
             log.info(f"History: pruned oldest turn ≈ {oldest["tokens"]} tokens")
