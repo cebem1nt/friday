@@ -97,16 +97,26 @@ def random_thinking_quote():
 def today():
     return datetime.today().strftime('%Y-%m-%d')
 
-def notify(message: str, details: str):
+def notify(
+    message: str, 
+    details: str,
+    is_syncronous: bool = False
+):
     if not config.get("misc", "send_notifications", bool):
         return
 
     icon = random.choice(FRIDAY_ICONS)
-    subprocess.Popen([
+    args = [
         "notify-send", message, details,
             "-a", "friday", 
             "-i", icon 
-    ])
+    ]
+
+    if is_syncronous:
+        args.append("-h")
+        args.append(f"string:x-canonical-private-synchronous:{sys.argv[0]}")
+
+    subprocess.Popen(args)
 
 def parse_duration(value: str) -> float:
     value = value.strip().lower()
