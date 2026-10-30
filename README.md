@@ -176,6 +176,10 @@ Speech recognition uses faster-whisper.
 
 The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama’s web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
 
+### System prompt 
+
+You can also modify default system prompt in order to tweak friday behaviour. Take a look at [`~/.config/friday/system_prompt.md`](./assets/system_prompt.md)
+
 ## GPU support for speech
 
 For NVIDIA GPU execution with ONNX Runtime, install the GPU runtime:
