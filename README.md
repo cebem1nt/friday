@@ -1,10 +1,20 @@
 # friday
 
-Fully local linux AI assistant built on top of `ollama`.
+Friday is a fully local linux AI assistant that you can talk to. It can do pretty much everything a common AI chat app does but also interract with your machine. Friday uses [ollama](https://github.com/ollama/ollama), [whisper](https://github.com/openai/whisper), [kokoro](https://github.com/thewh1teagle/kokoro-onnx) and works as a background IPC server
 
-## Installation 
+## Some of the things friday can do
 
-Setup with `uv`:
+- Search the internet
+- Open apps, open links in apps
+- Run shell commands
+- Get selected clipboard content, paste to clipboard 
+- Speak
+- Read / Write to files
+- Remember some settings long term
+
+## Setup
+
+Works only with python 3.13 as for now. Setup with `uv`:
 
 ```sh
 uv python install 3.13
@@ -12,7 +22,7 @@ uv venv --python 3.13 .venv
 uv pip install -r requirements.txt 
 ```
 
-Then copy default config to `~/.config/friday/`:
+Then copy default config and system prompt to `~/.config/friday/`:
 
 ```sh
 mkdir -p ~/.config/friday/
@@ -26,100 +36,82 @@ cp assets/system_prompt.md ~/.config/friday/
 cd ~/.config/friday/
 mkdir voices
 
-curl -L -o kokoro-v1.0.onnx \
+curl -L -o voices/kokoro-v1.0.onnx \
   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx
 
-curl -L -o voices-v1.0.bin \
+curl -L -o voices/voices-v1.0.bin \
   https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
 ```
 
 ## Usage
 
+Firstly you have to startup friday daemon, you can start daemon via:
+
 ```sh
-# Run the IPC server once at startup
 ./fridayd
 ```
 
-```sh
-# Chat from cli
-./friday --chat
+> [!TIP]
+> You can startup it acording to the preferred way of your winow manager / DE or via ***systemd service***
 
-# Or dictate a prompt
-./friday --converse # Run ./friday --converse once more to submit the prompt
+You can chat with friday from cli:
+
+```sh
+./friday
+```
+
+You also dictate a prompt to friday (push to talk), run `./friday --converse` once more to finish dictation
+
+```sh
+./friday --converse
+```
+
+> [!TIP]
+> Setup a key binding in your window manager / desktop environment to run `friday --converse`
+
+You can pass a single question using `-a` argument
+
+```sh
+./friday -a 'why is the sky blue?'
+```
+
+Friday has a single chat, it does not wipe the chat history untill context window gets to small. It still stores all the messages in a database, so friday can rememeber things from past if you ask it to. If you want to cleanup active chat, use `-w` or `--wipe` or ask friday to wipe current chat history.
+
+```sh
+./friday -w
+```
+
+> [!NOTE]
+> You can configure the way friday manages it's context in `~/.config/friday/config.ini`
+
+### Other commands:
+```
+usage: friday [-h] [-a ASK] [-I IMAGE [IMAGE ...]] [-A AUDIO [AUDIO ...]] [-c] [-w] [-r] [-s SAY] {serve} ...
+
+Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.
+
+positional arguments:
+  {serve}               available commands
+    serve               start friday IPC server
+
+options:
+  -h, --help            show this help message and exit
+  -a, --ask ASK         ask friday given content (pass as single argument)
+  -I, --image IMAGE [IMAGE ...]
+                        attach these image[s]. use with --ask
+  -A, --audio AUDIO [AUDIO ...]
+                        attach audio. use with --ask
+  -c, --converse        start recording audio, when run once more - stop recording and get response from friday
+  -w, --wipe            wipe current friday context
+  -r, --reload          reload running friday server (reloads config, restarts everything)
+  -s, --say SAY         make friday say given text
 ```
 
 ## Configuration
 
-You can modify your `~/.config/friday/config.ini`:
+Friday is configured via `.ini` config file, take a look at [`~/.config/friday/config.ini`](./assets/config.ini), it is well documented
 
-```ini
-[ai]
-# Ollama model to use
-model = gemma4:e4b
-think = true
-
-# Allow model to use tools (if supported)
-# tools are any interractions AI can do. Examples:
-#  open apps, search web, look into clipboard, etc..
-use_tools = true
-
-# Keep model in memory for N minutes after a message
-keep_alive = 30m
-
-# Top limit of firday's context window (in tokens)
-# If model does not reply to your request / halucinate, try increasing this limit 
-# Use "unlimited" in order to use model's top limit
-num_ctx = 16384
-
-[misc]
-rich_formatting = true
-
-# The method / library to use for web searching availble options:
-# none    -> model won't be able to search the internet
-# ddgs    -> python library, local, best option
-# ollama  -> use default ollama web search functions (external, requires OLLAMA_API_KEY)
-# searxng -> searxng local server, provide url endpoint, requires json API to be enabled,
-#            requires installing the following libs: requests, trafilatura (for web_fetch)
-web_search_provider = ddgs
-
-searxng_url = http://localhost:8888/
-
-# Friday can take a screenshot of your screen (yes, only if you ask it to)
-# given script should print screenshot path to stdout on success
-# Note that screenshots will not be automatically deleted later. 
-screenshot_cmd = ~/.local/bin/screenshot
-
-# Amount of turns to forcefully keep in memory.
-# Turn is a full round of user prompt - model response, tool calls
-keep_recent_turns = 3
-
-# Tokens kept available in the context window for Friday's replies and tool use.
-# Older conversation turns that exceed the remaining context budget are archived
-# in the database and removed from the active chat history.
-context_reserve = 2000
-
-# Send various notifications (e.g reply message, listening status, etc)
-# requires notify-send
-send_notifications = true
-
-[tts]
-# Text to speech model (AI voice)
-model_path = ~/.config/friday/voices/kokoro-v1.0.onnx
-voices_path = ~/.config/friday/voices/voices-v1.0.bin
-
-voice = af_heart # The voice to use, see https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
-prefer_cpu = false # Prefer computing on CPU instead of GPU
-pre_allocate = true
-
-[stt]
-# Speech to text (Voice recognition model) uses faster-whisper.
-# See https://github.com/openai/whisper#available-models-and-languages
-model = small.en
-prefer_cpu = false # Prefer computing on CPU instead of GPU
-pre_allocate = false
-```
-
-## Unsorted notes 
+## Misc 
 
 In order to use onnx GPU runtime on nvidia, additionally install `onnxruntime-gpu` and `cudnn`:
 
@@ -131,3 +123,7 @@ On archlinux you can install `cudnn` with
 ```sh
 sudo pacman -S cudnn
 ```
+
+## TODOS
+
+- [ ] GUI in GTK 

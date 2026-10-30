@@ -108,7 +108,7 @@ if WEB_SEARCH_PROVIDER == "ddgs":
         Args:
             url: url of the web page
         """
-        return __(DDGS().extract(url))
+        return __(DDGS().extract(url, fmt="text_rich"))
 
 elif WEB_SEARCH_PROVIDER == "ollama":
     import ollama
@@ -255,10 +255,6 @@ def look_at_the_screen():
     """
 
     screenshot_cmd = config.get("misc", "screenshot_cmd")
-
-    if screenshot_cmd is None:
-        return "Screenshot tool is not configured by user!"
-
     out = __run_shell(screenshot_cmd)
     
     if out.returncode != 0:
@@ -311,7 +307,7 @@ def search_files(
 ):
     """
     Args:
-        pattern: file pattern to search, supports wildcards
+        pattern: list of file patterns to search, supports wildcards
         begin: Search root - a path, or environment variable.
     """
 
