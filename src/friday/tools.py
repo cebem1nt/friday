@@ -1,5 +1,6 @@
 from typing import Optional, Any
 from datetime import datetime
+from shutil import which
 from src import config, shared
 
 import subprocess, os, shutil, fnmatch, sys
@@ -372,16 +373,27 @@ def remind_at(
     if target <= now:
         target += timedelta(days=1) # Won't survive if host turns off
 
-    total = (target - now).total_seconds()
-
     if not content:
         content = "Anonimous reminder"
 
     message = f"This is a message from reminder - {content}"
 
+    if shutil.which("at"):
+        try:
+            subprocess.run(
+                ["at", "-t", target.strftime("%Y%m%d%H%M.%S")],
+                input=f"{sys.argv[0]} -a '{message}'\n", 
+                text=True, 
+                check=True
+            )
+            return "Reminder was set!"
+        except (OSError, subprocess.CalledProcessError):
+            pass
+
     try:
+        total = (target - now).total_seconds()
         subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
     except:
-        return "Could not set timer!"
+        return "Could not set reminder!"
 
     return "Reminder was set!"
