@@ -1,7 +1,8 @@
 from typing import Optional, Any
+from datetime import datetime
 from src import config, shared
 
-import subprocess, os, shutil, fnmatch
+import subprocess, os, shutil, fnmatch, sys
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
@@ -335,3 +336,52 @@ def search_files(
                 matches.append(os.path.join(folder, name))
 
     return __(matches)
+
+def time_now():
+    return __(datetime.now())
+
+def set_timer(
+    hours: int,
+    minutes: int, 
+    seconds: int,
+    content: Optional[str] = None
+):
+    total = seconds + (minutes * 60) + (hours * 60 * 60) 
+    
+    if not content:
+        content = "Anonimous timer"
+
+    message = f"This is a message from timer - {content}"
+
+    try:
+        subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
+    except:
+        return "Could not set timer!"
+
+    return "Timer was set!"
+
+def remind_at(
+    hours: int,
+    minutes: int, 
+    seconds: int,
+    content: Optional[str] = None
+):
+    now = datetime.now()
+    target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
+
+    if target <= now:
+        target += timedelta(days=1) # Won't survive if host turns off
+
+    total = (target - now).total_seconds()
+
+    if not content:
+        content = "Anonimous reminder"
+
+    message = f"This is a message from reminder - {content}"
+
+    try:
+        subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
+    except:
+        return "Could not set timer!"
+
+    return "Reminder was set!"
