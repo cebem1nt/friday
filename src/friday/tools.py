@@ -4,12 +4,12 @@ from src import config, shared
 import subprocess, os, shutil, fnmatch
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
-MAX_LEN = config.get("misc", "max_tool_response_length")
+MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
 
-if MAX_LEN.lower() == "unlimited":
-    MAX_LEN = float('inf')
+if MAX_TOOL_RESPONSE_LEN.lower() == "unlimited":
+    MAX_TOOL_RESPONSE_LEN = float('inf')
 else:
-    MAX_LEN = int(MAX_LEN)
+    MAX_TOOL_RESPONSE_LEN = int(MAX_TOOL_RESPONSE_LEN)
 
 TRIM_CONTENT = config.get("misc", "max_response_trim_content", bool)
 
@@ -78,9 +78,9 @@ def __(
 ) -> dict:
     content = str(content)
 
-    if (length := len(content)) > MAX_LEN:
+    if (length := len(content)) > MAX_TOOL_RESPONSE_LEN:
         if TRIM_CONTENT:
-            content = content[:MAX_LEN] + "..."
+            content = content[:MAX_TOOL_RESPONSE_LEN] + "..."
         else:
             content = f"Too big response ({length}), try shorter request!"
 
@@ -97,11 +97,14 @@ def __(
 if WEB_SEARCH_PROVIDER == "ddgs":
     from ddgs import DDGS
 
-    def web_search(query: str, max_results: int = 5):
+    def web_search(query: str, max_results: int = 10):
         """
         max_results should be >= 3
         """
         return __(DDGS().text(query, max_results=max_results))
+
+    def web_search_news(query: str, max_results: int = 10):
+        return __(DDGS().news(query, max_results=max_results))
 
     def web_fetch(url: str):
         """

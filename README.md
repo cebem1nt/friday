@@ -202,3 +202,5 @@ Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to p
 ## TODOS
 
 - [ ] GUI in GTK 
+- [ ] Integrations with gmail, google calendar
+- [ ] Improved chat context management - sort of additional old chats summary prompt 
