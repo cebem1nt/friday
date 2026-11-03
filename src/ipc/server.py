@@ -43,7 +43,6 @@ class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
         self.fr.idle_actions()
         self._next_task = time.monotonic() + self.task_interval
 
-
 class FridayServer(socketserver.StreamRequestHandler):
     server: FridayThreadingUnixStreamServer
 

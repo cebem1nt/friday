@@ -32,9 +32,9 @@ class Memory:
 
         os.makedirs(FRIDAY_CACHE_DIR, exist_ok=True)
         self._turns_file = os.path.join(FRIDAY_CACHE_DIR, ".turns.json")
-        
-        if not os.path.exists(self._turns_file) or \
-            config.get("misc", "wipe_chat_on_daemon_startup", bool):
+        wipe_context = config.get("misc", "wipe_chat_on_daemon_startup", bool)
+
+        if not os.path.exists(self._turns_file) or wipe_context:
             with open(self._turns_file, "w") as f:
                 json.dump([], f)
 
@@ -43,7 +43,8 @@ class Memory:
         
         if self.keep_recent_turns < 0:
             raise ValueError("keep_recent_turns must be >= 0")
-
+        
+        self.persistent_prompts: list[dict] = []
         self._system_prompts: list[dict] = []
         self._current_turn: Optional[dict] = None
 
@@ -88,9 +89,10 @@ class Memory:
     ):
         if system_prompts:
             out = list(self._system_prompts)
+            out += self.persistent_prompts
         else:
             out = []
-        
+
         for turn in self.__get_turns():
             messages = turn["messages"]
 
@@ -108,6 +110,16 @@ class Memory:
     def add_system_prompt(self, content: str):
         self._system_prompts.append({
             "role": "system",
+            "content": content
+        })
+
+    def add_persistent_prompt(
+        self, 
+        content: str,
+        role: str = "assistant"
+    ):
+        self.persistent_prompts.append({
+            "role": role,
             "content": content
         })
 
