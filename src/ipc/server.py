@@ -88,14 +88,20 @@ class FridayServer(socketserver.StreamRequestHandler):
                     self.__response_stream(self.server.fr.reply(
                         req["prompt"],
                         req.get("images"),
-                        req.get("audio")
+                        req.get("audio"),
+                        silent=req.get("silent"),
+                        say_thinking_quote=req.get("say_thinking_quote"),
+                        model=req.get("model")
                     ))
                 else:
                     self.__response(self.server.fr.reply(
                         req["prompt"],
                         req.get("images"),
                         req.get("audio"),
-                        stream=False
+                        stream=False,
+                        silent=req.get("silent"),
+                        say_thinking_quote=req.get("say_thinking_quote"),
+                        model=req.get("model")
                     ))
 
             case _:

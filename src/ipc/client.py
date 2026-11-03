@@ -44,7 +44,10 @@ class FridayClient:
         prompt: str,
         images: Optional[list[str]] = None, 
         audio: Optional[list[str]] = None,
-        stream: bool = True
+        stream: bool = True,
+        say_thinking_quote: bool = True,
+        silent: bool = False,
+        model: Optional[str] = None
     ) -> Generator[tuple[str, str]] | str:
         if images:
             images = [os.path.realpath(img) for img in images]
@@ -57,7 +60,10 @@ class FridayClient:
             "prompt": prompt,
             "images": images,
             "audio": audio,
-            "stream": stream
+            "stream": stream,
+            "say_thinking_quote": say_thinking_quote,
+            "silent": silent,
+            "model": model
         }
 
         if stream:
