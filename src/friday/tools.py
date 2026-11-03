@@ -1,12 +1,15 @@
 from typing import Optional, Any
-from datetime import datetime
+from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
 from shutil import which
 from src import config, shared
 
+from pprint import pprint
 import subprocess, os, shutil, fnmatch, sys
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
+USE_GOOGLE_TOOLS = config.get("misc", "use_google_tools", bool)
 
 if MAX_TOOL_RESPONSE_LEN.lower() == "unlimited":
     MAX_TOOL_RESPONSE_LEN = float('inf')
@@ -174,6 +177,78 @@ elif WEB_SEARCH_PROVIDER == "searxng":
         )
 
         return __(text or "")
+
+if USE_GOOGLE_TOOLS:
+    from google.auth.transport.requests import Request
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    API_SCOPES = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.readonly",
+    ]
+
+    if not os.path.exists("credentials.json"):
+        raise FileNotFoundError(
+            "In order to use google integrations, setup google OAauth project and save json credentials to credentials.json")
+
+    creds = None
+
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", API_SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "credentials.json", API_SCOPES
+            )
+
+            creds = flow.run_local_server(port=0)
+
+        with open("token.json", "w") as f:
+            f.write(creds.to_json())
+
+    gmail = build("gmail", "v1", credentials=creds)
+    calendar = build("calendar", "v3", credentials=creds)
+    calendar_info = calendar.calendars().get(calendarId="primary").execute()
+
+    def get_calendar_events(date: Optional[str] = None):
+        """
+        Takes in a date in format: "%Y-%m-%d". If omitted - today
+        Returns events for that date.
+        """
+
+        if date is None:
+            date = datetime.today()
+        else:
+            date = datetime.strptime(date, "%Y-%m-%d").date()
+        
+        tz = ZoneInfo(calendar_info["timeZone"])
+        start = datetime.combine(date, time.min, tzinfo=tz)
+        end = start + timedelta(days=1)
+
+        events = calendar.events().list(
+            calendarId="primary",
+            timeMin=start.isoformat(),
+            timeMax=end.isoformat(),
+            singleEvents=True,
+            orderBy="startTime",
+            maxResults=2500,
+        ).execute().get("items", [])
+
+        return __([
+            {
+                "title": event.get("summary", "(no title)"),
+                "start": event.get("start", {}).get("dateTime") or event.get("start", {}).get("date"),
+                "end": event.get("end", {}).get("dateTime") or event.get("end", {}).get("date"),
+                **({"location": event["location"]} if event.get("location") else {}),
+                **({"description": event["description"]} if event.get("description") else {}),
+            }
+            for event in events
+        ])
 
 def run_messages_history_sql(sql: str):
     return __(shared.db.run_sql(sql))
@@ -345,13 +420,9 @@ def set_timer(
     hours: int,
     minutes: int, 
     seconds: int,
-    content: Optional[str] = None
+    content: str
 ):
     total = seconds + (minutes * 60) + (hours * 60 * 60) 
-    
-    if not content:
-        content = "Anonimous timer"
-
     message = f"This is a message from timer - {content}"
 
     try:
@@ -365,16 +436,15 @@ def remind_at(
     hours: int,
     minutes: int, 
     seconds: int,
-    content: Optional[str] = None
+    content: str
 ):
     now = datetime.now()
     target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
 
+    # TODO possibly more sophisticated reminders system
+
     if target <= now:
         target += timedelta(days=1) # Won't survive if host turns off
-
-    if not content:
-        content = "Anonimous reminder"
 
     message = f"This is a message from reminder - {content}"
 
@@ -397,3 +467,22 @@ def remind_at(
         return "Could not set reminder!"
 
     return "Reminder was set!"
+
+def type_content(content: str):
+    """
+    Types/writes given content to user's active input field
+    """
+
+    if os.environ.get("WAYLAND_DISPLAY"):
+        command = ["wtype", content]
+    else:
+        command = ["xdotool", "type", "--clearmodifiers", content]
+
+    try:
+        proc = __run(command)
+        if proc.returncode != 0:
+            return f"{command[0]} failed!"
+    except FileNotFoundError:
+        return f"Could not type content {command[0]} is not installed!"
+
+    return "Content was typed successfully"
