@@ -5,7 +5,7 @@ from shutil import which
 from src import config, shared
 
 from pprint import pprint
-import subprocess, os, shutil, fnmatch, sys
+import subprocess, os, shutil, fnmatch, sys, base64
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
@@ -187,6 +187,7 @@ if USE_GOOGLE_TOOLS:
     API_SCOPES = [
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/tasks.readonly"
     ]
 
     if not os.path.exists("credentials.json"):
@@ -211,15 +212,17 @@ if USE_GOOGLE_TOOLS:
         with open("token.json", "w") as f:
             f.write(creds.to_json())
 
-    gmail = build("gmail", "v1", credentials=creds)
-    calendar = build("calendar", "v3", credentials=creds)
-    calendar_info = calendar.calendars().get(calendarId="primary").execute()
+    gmail_api = build("gmail", "v1", credentials=creds)
+    calendar_api = build("calendar", "v3", credentials=creds)
+    tasks_api = build("tasks", "v1", credentials=creds)
 
     def get_calendar_events(date: Optional[str] = None):
         """
         Takes in a date in format: "%Y-%m-%d". If omitted - today
         Returns events for that date.
         """
+
+        calendar_info = calendar_api.calendars().get(calendarId="primary").execute()
 
         if date is None:
             date = datetime.today()
@@ -230,13 +233,12 @@ if USE_GOOGLE_TOOLS:
         start = datetime.combine(date, time.min, tzinfo=tz)
         end = start + timedelta(days=1)
 
-        events = calendar.events().list(
+        events = calendar_api.events().list(
             calendarId="primary",
             timeMin=start.isoformat(),
             timeMax=end.isoformat(),
             singleEvents=True,
             orderBy="startTime",
-            maxResults=2500,
         ).execute().get("items", [])
 
         return __([
@@ -249,6 +251,91 @@ if USE_GOOGLE_TOOLS:
             }
             for event in events
         ])
+
+    def get_google_tasks():
+        task_lists = tasks_api.tasklists().list().execute().get("items", [])
+        out = {}
+
+        for task_list in task_lists:
+            tasks = tasks_api.tasks().list(
+                tasklist=task_list["id"],
+                maxResults=100,
+                showCompleted=False,
+            ).execute().get("items", [])
+
+            out[task_list["title"]] = [
+                {
+                    "title": task.get("title"),
+                    "due": task.get("due"),
+                    "notes": task.get("notes"),
+                }
+                for task in tasks
+            ]
+
+        return __(out)
+
+    def __collect_gmail_bodies(part, bodies):
+        mime_type = part.get("mimeType")
+        data = part.get("body", {}).get("data")
+
+        if mime_type in bodies and data:
+            data += "=" * (-len(data) % 4)
+            text = base64.urlsafe_b64decode(data).decode(
+                "utf-8", errors="replace"
+            )
+            bodies[mime_type].append(text)
+
+        for child in part.get("parts", []):
+            __collect_gmail_bodies(child, bodies)
+
+    def get_unread_emails(date: Optional[str] = None):
+        """
+        Get unread emails for %Y-%m-%d". Defaults to today.
+        """
+        
+        if date is None:
+            day = datetime.today()
+        else:
+            day = datetime.strptime(date, "%Y-%m-%d").date()
+        
+        next_day = day + timedelta(days=1)
+
+        messages = gmail_api.users().messages().list(
+            userId="me",
+            q=f"is:unread -in:trash -in:spam -category:promotions -category:social after:{day:%Y/%m/%d} before:{next_day:%Y/%m/%d}",
+            maxResults=100,
+        ).execute().get("messages", [])
+
+        out = []
+
+        for item in messages:
+            message = gmail_api.users().messages().get(
+                userId="me",
+                id=item["id"],
+                format="full",
+            ).execute()
+
+            headers = {
+                h["name"].lower(): h["value"]
+                for h in message["payload"].get("headers", [])
+            }
+
+            bodies = {"text/plain": [], "text/html": []}
+            __collect_gmail_bodies(message["payload"], bodies)
+            body = (
+                "\n".join(bodies["text/plain"])
+                or "\n".join(bodies["text/html"])
+                or message.get("snippet", "")
+            )
+
+            out.append({
+                "from": headers.get("from"),
+                "subject": headers.get("subject"),
+                "date": headers.get("date"),
+                "body": body,
+            })
+
+        return __(out)
 
 def run_messages_history_sql(sql: str):
     return __(shared.db.run_sql(sql))

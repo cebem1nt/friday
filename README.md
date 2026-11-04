@@ -44,6 +44,8 @@ cp assets/system_prompt.md ~/.config/friday/
 
 ### Voices
 
+Run this to setup voices for friday: 
+
 ```sh
 cd ~/.config/friday/
 mkdir voices
@@ -172,6 +174,7 @@ Speech recognition uses faster-whisper.
 | `max_response_trim_content` | `true` | Trims oversized tool responses to the configured limit |
 | `send_notifications` | `true` | Sends desktop notifications (requires `notify-send`) |
 | `log_thinking` | `false` | Logs the model’s thinking process when running the daemon |
+| `use_google_tools` | `false` | Enable google integrations. [See section below](#google-integrations--gmail-tasks-and-calendar) |
 | `wipe_chat_on_daemon_startup` | `false` | Clears the active chat when the daemon starts |
 
 The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama’s web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
@@ -179,6 +182,38 @@ The `ddgs` provider searches the web using the Python library. The `ollama` prov
 ### System prompt 
 
 You can also modify default system prompt in order to tweak friday behaviour. Take a look at [`~/.config/friday/system_prompt.md`](./assets/system_prompt.md)
+
+## Google integrations — Gmail, Tasks, and Calendar
+
+You can setup friday to read your latest emails, tasks and evenets from calendar, but it requires additional setup: 
+
+### 0. Enable google tools
+
+Set `misc.use_google_tools` to true in [`~/.config/friday/config.ini`](./assets/config.ini)
+
+### 1. Create a Google Cloud project
+
+[Open Google Cloud Console](https://console.cloud.google.com/projectcreate) and create a new project.
+
+### 2. Enable the APIs
+
+Open each API page for your project and click **Enable**:
+
+- [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+- [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+- [Google Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com)
+
+### 3. Configure the OAuth consent screen
+
+Open [Google Auth Platform](https://console.cloud.google.com/auth/overview) in your project. Configure the app’s name and contact email. Under **Audience**, choose **External** for a personal Gmail account and leave the app in **Testing**. Add the Gmail address you’ll sign in with under **Test users**.
+
+### 4. Create and download an OAuth client
+
+In Google Auth Platform, open **Clients**, choose **Create client**, and select **Desktop app**. Create the client, download its JSON file, and save it in friday project directory as `credentials.json`.
+
+Now re-run `fridayd`. A browser window will open so you can sign in as the test user and approve access.
+
+**Testing-mode note:** Google limits Testing apps to listed test users, and authorizations for these scopes expire after seven days. You may need to authorize the app again weekly.
 
 ## GPU support for speech
 
