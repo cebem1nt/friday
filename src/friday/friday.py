@@ -53,11 +53,11 @@ Treat brief or ambiguous phrases as possible references, and search relevant mes
 ## Persistent context file
 
 You have a special session-persistent additional context file. Add to or overwrite it using `update_extra_context`. 
-Use it to preserve useful references, observations, and facts that can help in future turns. Do not store settings themselves here.
+Use it to preserve useful references, observations/facts about user. Do not store settings themselves here.
 
 Whenever you struggle to understand or find something relevant to the user's request—such as an unclear reference, 
 a missing personal detail, or an unresolved search — use `update_extra_context` to record a concise note about what was unclear 
-or unavailable and what remains unresolved. Mark uncertainty clearly. Do not record guesses as facts.
+or unavailable and what remains unresolved. Mark uncertainty clearly. Do not record guesses as facts. Do not overwrite previous context for no reason.
 
 When you store a setting, mention in persistent context that the setting has been stored, but do not repeat the setting's content.
 
@@ -278,7 +278,7 @@ class Friday(Voice, Memory):
                 is_thinking = False
                 output = ""
 
-                for chunk_t, chunk in self.__stream_reply(prompt, images, audio):
+                for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model):
                     if chunk_t == "thinking" and not is_thinking:
                         if not silent and say_thinking_quote:
                             self.say(shared.random_thinking_quote())
@@ -323,8 +323,10 @@ class Friday(Voice, Memory):
 
         shared.notify("Friday is done listening", "Transcribing your audio...", True)
         prompt = self.done_listening()
-        shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
-        return self.reply(prompt, stream=stream, notify_content=True)
+        
+        if prompt:
+            shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
+            return self.reply(prompt, stream=stream, notify_content=True)
 
     def idle_actions(self):
         self.kokoro.unload_if_idle()

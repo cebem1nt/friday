@@ -1,10 +1,8 @@
 from typing import Optional, Any
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
-from shutil import which
 from src import config, shared
 
-from pprint import pprint
 import subprocess, os, shutil, fnmatch, sys, base64
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
@@ -182,7 +180,7 @@ if USE_GOOGLE_TOOLS:
     from google.auth.transport.requests import Request
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
+    from googleapiclient.discovery import build as __build_api
 
     API_SCOPES = [
         "https://www.googleapis.com/auth/gmail.readonly",
@@ -212,9 +210,9 @@ if USE_GOOGLE_TOOLS:
         with open("token.json", "w") as f:
             f.write(creds.to_json())
 
-    gmail_api = build("gmail", "v1", credentials=creds)
-    calendar_api = build("calendar", "v3", credentials=creds)
-    tasks_api = build("tasks", "v1", credentials=creds)
+    gmail_api = __build_api("gmail", "v1", credentials=creds)
+    calendar_api = __build_api("calendar", "v3", credentials=creds)
+    tasks_api = __build_api("tasks", "v1", credentials=creds)
 
     def get_calendar_events(date: Optional[str] = None):
         """
@@ -341,6 +339,9 @@ def run_messages_history_sql(sql: str):
     return __(shared.db.run_sql(sql))
 
 def run_shell(cmd: str):
+    """
+    Pass cmd as single string
+    """
     out = __run_shell(cmd)
 
     return __({
