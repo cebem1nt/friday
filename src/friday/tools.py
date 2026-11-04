@@ -183,9 +183,9 @@ if USE_GOOGLE_TOOLS:
     from googleapiclient.discovery import build as __build_api
 
     API_SCOPES = [
+        "https://www.googleapis.com/auth/tasks",
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/calendar.readonly",
-        "https://www.googleapis.com/auth/tasks.readonly"
     ]
 
     if not os.path.exists("credentials.json"):
@@ -216,8 +216,7 @@ if USE_GOOGLE_TOOLS:
 
     def get_calendar_events(date: Optional[str] = None):
         """
-        Takes in a date in format: "%Y-%m-%d". If omitted - today
-        Returns events for that date.
+        Takes date in format: "%Y-%m-%d". If omitted - today
         """
 
         calendar_info = calendar_api.calendars().get(calendarId="primary").execute()
@@ -272,6 +271,30 @@ if USE_GOOGLE_TOOLS:
 
         return __(out)
 
+    def create_google_task(
+        title: str, 
+        date: Optional[str] = None, 
+        notes: Optional[str] = None, 
+    ):
+        """
+        Takes date in format: "%Y-%m-%d". If omitted - today
+        """
+        if not date:
+            due = datetime.today().strftime("%Y-%m-%dT00:00:00.000Z")
+        else:
+            due = datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%dT00:00:00.000Z")
+
+        body = { "title": title, "due": due }
+        if notes:
+            body["notes"] = notes
+
+        task = tasks_api.tasks().insert(
+            tasklist="@default",
+            body=body,
+        ).execute()
+
+        return "Task was created!"
+
     def __collect_gmail_bodies(part, bodies):
         mime_type = part.get("mimeType")
         data = part.get("body", {}).get("data")
@@ -286,9 +309,17 @@ if USE_GOOGLE_TOOLS:
         for child in part.get("parts", []):
             __collect_gmail_bodies(child, bodies)
 
-    def get_unread_emails(date: Optional[str] = None):
+    def get_google_emails(
+        date: Optional[str] = None,
+        unread_only: bool = True
+    ):
         """
-        Get unread emails for %Y-%m-%d". Defaults to today.
+        Args:
+            date: format %Y-%m-%d". Defaults to today.
+            unread_only: Boolean, if Fasle - return all emails for the date.
+        
+        Note:
+            set unread_only to False only when user specifically asks to
         """
         
         if date is None:
@@ -297,10 +328,14 @@ if USE_GOOGLE_TOOLS:
             day = datetime.strptime(date, "%Y-%m-%d").date()
         
         next_day = day + timedelta(days=1)
+        query = f"-in:trash -in:spam -category:promotions -category:social after:{day:%Y/%m/%d} before:{next_day:%Y/%m/%d}"
+
+        if unread_only:
+            query += " is:unread"
 
         messages = gmail_api.users().messages().list(
             userId="me",
-            q=f"is:unread -in:trash -in:spam -category:promotions -category:social after:{day:%Y/%m/%d} before:{next_day:%Y/%m/%d}",
+            q=query,
             maxResults=100,
         ).execute().get("messages", [])
 
@@ -339,9 +374,6 @@ def run_messages_history_sql(sql: str):
     return __(shared.db.run_sql(sql))
 
 def run_shell(cmd: str):
-    """
-    Pass cmd as single string
-    """
     out = __run_shell(cmd)
 
     return __({
@@ -350,9 +382,9 @@ def run_shell(cmd: str):
         "stderr": out.stderr
     })
 
-def spawn_process(cmd: list[str]):
+def spawn_process(args: list[str]):
     try:
-        __popen(cmd)
+        __popen(args)
         return "Process spawned"
     except:
         return "Could not spawn process!"
@@ -419,7 +451,6 @@ def paste_to_user_selection(content: str):
 def look_at_the_screen():
     """
     Take a screenshot of what's going on user's screen right now.
-    Use this in order to understand current screen state of the user
     """
 
     screenshot_cmd = config.get("misc", "screenshot_cmd")
@@ -504,6 +535,11 @@ def search_files(
 def time_now():
     return __(datetime.now())
 
+# TODO these reminders and timers are very fragile and
+# might be confusing for the model. Needs rework
+
+# TODO possibly more sophisticated reminders system
+
 def set_timer(
     hours: int,
     minutes: int, 
@@ -528,8 +564,6 @@ def remind_at(
 ):
     now = datetime.now()
     target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
-
-    # TODO possibly more sophisticated reminders system
 
     if target <= now:
         target += timedelta(days=1) # Won't survive if host turns off
