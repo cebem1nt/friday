@@ -61,6 +61,10 @@ class Database:
         results = []
         statement = ""
 
+        # SQLite string literals escape apostrophes by doubling them, not with \'.
+        # Model can still fuck this up despite system prompt.
+        sql = sql.replace("\\'", "''")
+
         with self.con() as con:
             statements = []
 

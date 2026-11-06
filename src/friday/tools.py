@@ -294,7 +294,7 @@ if USE_GOOGLE_TOOLS:
             body=body,
         ).execute()
 
-        return "Task was created!"
+        return "Task was created"
 
     def complete_google_task(task_id: str):
         tasks_api.tasks().patch(
@@ -303,7 +303,7 @@ if USE_GOOGLE_TOOLS:
             body={"status": "completed"},
         ).execute()
 
-        return "Task was marked as completed!"
+        return "Task was marked as completed"
 
     def delete_google_task(task_id: str):
         tasks_api.tasks().delete(
@@ -311,7 +311,7 @@ if USE_GOOGLE_TOOLS:
             task=task_id,
         ).execute()
 
-        return "Task was deleted!"
+        return "Task was deleted"
 
     def __collect_gmail_bodies(part, bodies):
         mime_type = part.get("mimeType")
@@ -328,25 +328,21 @@ if USE_GOOGLE_TOOLS:
             __collect_gmail_bodies(child, bodies)
 
     def get_google_emails(
-        date: Optional[str] = None,
+        date_from: str,
+        date_until: Optional[str] = None,
         unread_only: bool = True
-    ):
-        """
-        Args:
-            date: format %Y-%m-%d". Defaults to today.
-            unread_only: Boolean, if Fasle - return all emails for the date.
-        
-        Note:
-            set unread_only to False only when user specifically asks to
-        """
-        
-        if date is None:
-            day = datetime.today()
+    ):      
+        start_day = datetime.strptime(date_from, "%Y-%m-%d").date()
+
+        if date_until:
+            end_day = datetime.strptime(date_until, "%Y-%m-%d").date()
         else:
-            day = datetime.strptime(date, "%Y-%m-%d").date()
-        
-        next_day = day + timedelta(days=1)
-        query = f"-in:trash -in:spam -category:promotions -category:social after:{day:%Y/%m/%d} before:{next_day:%Y/%m/%d}"
+            end_day = datetime.today().date()
+
+        # Gmail's before: boundary is exclusive, so add one day to include date_until.
+        next_day = end_day + timedelta(days=1)
+
+        query = f"-in:trash -in:spam -category:promotions -category:social after:{start_day:%Y/%m/%d} before:{next_day:%Y/%m/%d}"
 
         if unread_only:
             query += " is:unread"
