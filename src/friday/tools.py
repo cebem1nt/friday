@@ -265,6 +265,7 @@ if USE_GOOGLE_TOOLS:
                     "title": task.get("title"),
                     "due": task.get("due"),
                     "notes": task.get("notes"),
+                    "id": task.get("id")
                 }
                 for task in tasks
             ]
@@ -294,6 +295,23 @@ if USE_GOOGLE_TOOLS:
         ).execute()
 
         return "Task was created!"
+
+    def complete_google_task(task_id: str):
+        tasks_api.tasks().patch(
+            tasklist="@default",
+            task=task_id,
+            body={"status": "completed"},
+        ).execute()
+
+        return "Task was marked as completed!"
+
+    def delete_google_task(task_id: str):
+        tasks_api.tasks().delete(
+            tasklist="@default",
+            task=task_id,
+        ).execute()
+
+        return "Task was deleted!"
 
     def __collect_gmail_bodies(part, bodies):
         mime_type = part.get("mimeType")
