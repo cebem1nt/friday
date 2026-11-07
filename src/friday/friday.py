@@ -74,7 +74,7 @@ Before asking for clarification or saying information is unavailable:
 
 ## When relevant information is unclear or missing
 
-If you cannot understand a reference or find the information needed - Use `update_extra_context` to record a concise note about what was unclear or unavailable.
+If you cannot understand a reference or find the information needed - Use `add_extra_context` to record a concise note about what was unclear or unavailable.
 
 1. State what remains unresolved.
 2. Clearly mark uncertainty. Do not record guesses as facts.
@@ -136,7 +136,7 @@ class Friday(Voice, Memory):
             }
 
             self.tools["clean_memory"] = self.clean_memory 
-            self.tools["update_extra_context"] = self.update_extra_context 
+            self.tools["add_extra_context"] = self.add_extra_context 
             self.add_system_prompt(TOOLS_PROMPT.strip())
 
             if config.get("misc", "web_search_provider") == "none":
@@ -355,15 +355,13 @@ class Friday(Voice, Memory):
         self.kokoro.unload_if_idle()
         self.whisper.unload_if_idle()
 
-    def update_extra_context(
-        self, 
-        context: str, 
-        overwrite: bool = False
-    ):
-        mode = 'w' if overwrite else 'a'
-        
-        with open(EXTRA_CONTEXT_FILE, mode) as f:
-            f.write(context + '\n')
+    def add_extra_context(self, context: str):
+        if not os.path.exists(EXTRA_CONTEXT_FILE):
+            with open(EXTRA_CONTEXT_FILE, "w") as f:
+                f.write("# Extra context\n\n")
+
+        with open(EXTRA_CONTEXT_FILE, "a") as f:
+            f.write("- " + context + '\n')
 
         if self.persistent_prompts:
             self.persistent_prompts.pop()

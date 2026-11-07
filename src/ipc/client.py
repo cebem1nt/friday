@@ -1,12 +1,15 @@
 import socket, os, json
 from contextlib import contextmanager
 
-from src.shared import SOCKET_PATH
+from src.shared import SOCKET_PATH, friday_server_is_running
 from typing import Any, BinaryIO, Optional, Generator
 
 class FridayClient:
     @contextmanager
     def connection(self):
+        if not friday_server_is_running():
+            raise RuntimeError("Friday server is not running")
+
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.connect(SOCKET_PATH)
             with s.makefile("rwb") as stream:
