@@ -104,7 +104,10 @@ if WEB_SEARCH_PROVIDER == "ddgs":
         """
         max_results should be >= 3
         """
-        return __(DDGS().text(query, max_results=max_results))
+        try: 
+            return __(DDGS().text(query, max_results=max_results))
+        except Exception as e:
+            return str(e)
 
     def web_search_news(query: str, max_results: int = 10):
         return __(DDGS().news(query, max_results=max_results))
@@ -396,9 +399,9 @@ def run_shell(cmd: str):
         "stderr": out.stderr
     })
 
-def spawn_process(args: list[str]):
+def spawn_process(cmd: str):
     try:
-        __popen(args)
+        __popen_shell(cmd)
         return "Process spawned"
     except:
         return "Could not spawn process!"

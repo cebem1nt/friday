@@ -30,7 +30,7 @@ When user asks to run an application - firstly find an existing .desktop entry f
 
 1. `ls /usr/share/applications` Look for matching desktop entry
 2. If not found - `ls ~/.local/share/applications` 
-3. If you found a desktop entry: spawn_process(["gtk-launch", "<entry>.desktop"])
+3. If you found a desktop entry: spawn_process("gtk-launch <entry>.desktop")
 
 ## `get_user_selection` - get content from clipboard. 
 
