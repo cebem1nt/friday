@@ -96,17 +96,6 @@ class Friday(Voice, Memory):
         self.model = config.get("ai", "model")
         self.model_info = ollama.show(self.model)
 
-        arch = self.model_info.modelinfo.get("general.architecture")
-        required_context_length = config.get("ai", "num_ctx")
-
-        if required_context_length == "unlimited":
-            context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
-        else:
-            context_length = int(required_context_length)
-
-        Voice.__init__(self)
-        Memory.__init__(self, context_length)
-
         capabilities = self.model_info.capabilities
         log.debug(f"capabilities: {capabilities}")
 
@@ -117,6 +106,30 @@ class Friday(Voice, Memory):
         self.supports_vision = "vision" in capabilities
         self.supports_audio = "audio" in capabilities
         self.supports_thinking = "thinking" in capabilities
+
+        arch = self.model_info.modelinfo.get("general.architecture")
+        required_context_length = config.get("ai", "num_ctx")
+
+        if required_context_length == "unlimited":
+            context_length = self.model_info.modelinfo.get(f"{arch}.context_length")
+        else:
+            context_length = int(required_context_length)
+
+        if config.get("ai", "preload", bool):
+            models = { m.name for m in ollama.ps().models }
+
+            if not self.model in models:            
+                log.info("Friday: pre-loading model")
+
+                ollama.chat(
+                    model=self.model,
+                    messages=[],
+                    think=False if self.supports_thinking else None,
+                    keep_alive=config.get("ai", "keep_alive")
+                )
+
+        Voice.__init__(self)
+        Memory.__init__(self, context_length)
 
         self.think = config.get("ai", "think", bool)
 
@@ -164,19 +177,6 @@ class Friday(Voice, Memory):
 
         # TODO restructure this long __init__
         # TODO imagine having a multithread init
-
-        if config.get("ai", "preload", bool):
-            models = { m.name for m in ollama.ps().models }
-
-            if not self.model in models:            
-                log.info("Friday: pre-loading model")
-
-                ollama.chat(
-                    model=self.model,
-                    messages=[],
-                    think=False if self.supports_thinking else None,
-                    keep_alive=config.get("ai", "keep_alive")
-                )
 
     def __stream_reply(
         self, 
