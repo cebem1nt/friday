@@ -77,19 +77,12 @@ class Friday(Voice, Memory):
 
             self.tools["clean_memory"] = self.clean_memory 
             self.tools["add_extra_context"] = self.add_extra_context 
-            self.add_system_prompt(tools.TOOLS_PROMPT.strip())
 
             if config.get("misc", "web_search_provider") == "none":
                 self.tools.pop("web_search")
                 self.tools.pop("web_fetch")
             else:
                 log.info("Friday: Web search is enabled")
-
-                self.add_system_prompt((
-                    "When you don't know or aren't confident about a factual detail needed to fulfill a request use `web_search` "
-                    "to check or search before acting. You can use web to learn. Use `web_fetch` to inspect a relevant result by URL. "
-                    "If `web_search` says no results found, try different request before reporting to the user"
-                ))
                 
             log.debug(f"tools: {pformat(self.tools, 2, compact=False)}")
 
