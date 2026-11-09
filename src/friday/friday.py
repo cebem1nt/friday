@@ -116,10 +116,11 @@ class Friday(Voice, Memory):
         self.supports_tools = "tools" in capabilities
         self.supports_vision = "vision" in capabilities
         self.supports_audio = "audio" in capabilities
+        self.supports_thinking = "thinking" in capabilities
 
         self.think = config.get("ai", "think", bool)
 
-        if not "thinking" in capabilities:
+        if not self.supports_thinking:
             log.info("Thinking is not supported by model")
             self.think = None
 
@@ -156,12 +157,26 @@ class Friday(Voice, Memory):
             log.warn("Tools aren't supported by the model")
 
         # This one must be added as the latest prompt
-        if not os.path.exists(EXTRA_CONTEXT_FILE):
-            return
+        if os.path.exists(EXTRA_CONTEXT_FILE):
+            with open(EXTRA_CONTEXT_FILE) as f:
+                if content := f.read():
+                    self.add_persistent_prompt(content, "assistant")
 
-        with open(EXTRA_CONTEXT_FILE) as f:
-            if content := f.read():
-                self.add_persistent_prompt(content, "assistant")
+        # TODO restructure this long __init__
+        # TODO imagine having a multithread init
+
+        if config.get("ai", "preload", bool):
+            models = { m.name for m in ollama.ps().models }
+
+            if not self.model in models:            
+                log.info("Friday: pre-loading model")
+
+                ollama.chat(
+                    model=self.model,
+                    messages=[],
+                    think=False if self.supports_thinking else None,
+                    keep_alive=config.get("ai", "keep_alive")
+                )
 
     def __stream_reply(
         self, 

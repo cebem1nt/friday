@@ -236,6 +236,7 @@ Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to p
 
 ## TODOS
 
+- [ ] More handling for runtime model change + improve reloading
 - [ ] GUI in GTK 
 - [x] Integrations with gmail, google calendar
 - [x] Improved chat context management - sort of additional old chats summary prompt 
