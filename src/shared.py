@@ -99,7 +99,9 @@ def random_thinking_quote():
     return random.choice(THINKING_QUOTES)
 
 def today():
-    return datetime.today().strftime('%Y-%m-%d')
+    weekday_map = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    today = datetime.today()
+    return today.strftime(f'%Y-%m-%d {weekday_map[today.weekday()]}') 
 
 def notify(
     message: str, 
