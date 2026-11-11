@@ -7,14 +7,13 @@ from src.shared import (
     friday_server_is_running
 )
 
-log.info("Importing Friday, ollama...")
-from src.friday.friday import Friday
-
 import os, json, socketserver, socket, time, threading
 
 class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
     def __init__(self, *args, task_interval: int = 60, **kwargs):
         super().__init__(*args, **kwargs)
+        log.info("Importing Friday, ollama...")
+        from src.friday.friday import Friday
         self.fr = Friday()
         self.task_interval = task_interval
         self._next_task = time.monotonic() + task_interval
@@ -52,6 +51,8 @@ class FridayServer(socketserver.StreamRequestHandler):
         self.__send_json({"type": "done"})
 
     def __reload_friday(self):
+        log.info("Importing Friday, ollama...")
+        from src.friday.friday import Friday
         config.parse() # re-parse config
         self.server.fr = Friday()
         log.info("Friday was reloaded")

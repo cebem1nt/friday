@@ -164,6 +164,7 @@ Speech recognition uses faster-whisper.
 
 | Setting | Default | Purpose |
 |---|---|---|
+| `enable_thinking_quotes` | `true` | Say thinking quotes |
 | `web_search_provider` | `ddgs` | Web search backend: `none`, `ddgs`, `ollama`, or `searxng` |
 | `searxng_url` | `http://localhost:8888/` | SearXNG endpoint when using that provider |
 | `screenshot_cmd` | `~/.local/bin/screenshot` | Command Friday uses to take a screenshot when requested |

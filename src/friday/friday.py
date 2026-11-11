@@ -306,7 +306,7 @@ class Friday(Voice, Memory):
 
                     for chunk_t, chunk in self.__reply(prompt, images, audio, model, think):
                         if chunk_t == "thinking" and not is_thinking:
-                            if not silent and say_thinking_quote:
+                            if not silent and say_thinking_quote and config.get("misc", "enable_thinking_quotes", bool):
                                 self.say(shared.random_thinking_quote())
                             is_thinking = True
 

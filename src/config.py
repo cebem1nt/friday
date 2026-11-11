@@ -1,8 +1,13 @@
 from configparser import ConfigParser
-from src.shared import FRIDAY_CONFIG_PATHS
 from typing import Any
-
 import os
+
+CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config/"))
+FRIDAY_CONFIG_DIR = os.path.join(CONFIG_HOME, "friday")
+FRIDAY_CONFIG_PATHS = [
+    os.path.join(CONFIG_HOME, "friday", "config.ini"),
+    "/etc/friday/config.ini"
+]
 
 _config = None
 

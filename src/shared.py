@@ -12,11 +12,6 @@ FRIDAY_LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
 FRIDAY_CACHE_DIR = os.path.join(CACHE_HOME, "friday")
 FRIDAY_CONFIG_DIR = os.path.join(CONFIG_HOME, "friday")
 
-FRIDAY_CONFIG_PATHS = [
-    os.path.join(CONFIG_HOME, "friday", "config.ini"),
-    "/etc/friday/config.ini"
-]
-
 # From papirus icon theme
 # TODO pack these icons with friday (if it's okay)
 FRIDAY_ICONS = [f"si-syncthing-{n}" for n in range(1, 12)]
