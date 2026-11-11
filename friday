@@ -10,20 +10,21 @@ if __name__ == "__main__":
     p.add_argument("-lf", "--log-file",  help="duplicate logs to this file")
 
     p.add_argument("content", metavar="[CONTENT]", nargs=argparse.REMAINDER, help="content to send to Friday")
-    p.add_argument("-m", "--model",       help="answer given content using this model")
-    p.add_argument("-M", "--set-model",   help="set model to given one at runtime without server reloading")
-    p.add_argument("-I", "--image",       nargs='+', help="attach these image[s]")
-    p.add_argument("-A", "--audio",       nargs='+', help="attach audio")
-    p.add_argument("-s", "--silent",      action="store_true", help="do not speak responses aloud")
+    p.add_argument("-m", "--model",    help="answer given content using this model")
+    p.add_argument("-I", "--image",    nargs='+', help="attach these image[s]")
+    p.add_argument("-A", "--audio",    nargs='+', help="attach audio")
+    p.add_argument("-s", "--silent",   action="store_true", help="do not speak responses aloud")
+    p.add_argument("-o", "--one-shot", action="store_true", help="answer given content in an empty context, do not store in history afterwards")
+    p.add_argument("--think",          action=argparse.BooleanOptionalAction, help="enable or disable thinking (overwrites config default)")
 
+    p.add_argument("-M", "--set-model",help="set model to given one at runtime without server reloading")
     p.add_argument("-c", "--converse", action="store_true", help="start recording audio, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",     action="store_true", help="wipe current friday context")
     p.add_argument("-r", "--reload",   action="store_true", help="reload running friday server (reloads config, restarts everything). Note that some of the settings might still need a full server restart")
     
-    p.add_argument("--think",               action=argparse.BooleanOptionalAction, help="enable or disable thinking")
     p.add_argument("--no-thinking-quote",   action="store_true", help="just don't say random thinking quote")
-    p.add_argument("--serve",               action="store_true", help="start friday IPC server")
     p.add_argument("--say", metavar="TEXT", help="make friday say given text")
+    p.add_argument("--serve",               action="store_true", help="start friday IPC server")
 
     args = p.parse_args()
 
@@ -63,7 +64,8 @@ if __name__ == "__main__":
             silent=args.silent,
             stream=False,
             say_thinking_quote=not args.no_thinking_quote,
-            think=args.think
+            think=args.think,
+            one_shot=args.one_shot
         ))
 
     elif len(sys.argv) == 1:

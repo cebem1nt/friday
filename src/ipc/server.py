@@ -93,7 +93,8 @@ class FridayServer(socketserver.StreamRequestHandler):
                         silent=req.get("silent"),
                         say_thinking_quote=req.get("say_thinking_quote"),
                         model=req.get("model"),
-                        think=req.get("think")
+                        think=req.get("think"),
+                        one_shot=req.get("one_shot")
                     ))
                 else:
                     self.__response(self.server.fr.reply(
@@ -104,7 +105,8 @@ class FridayServer(socketserver.StreamRequestHandler):
                         silent=req.get("silent"),
                         say_thinking_quote=req.get("say_thinking_quote"),
                         model=req.get("model"),
-                        think=req.get("think")
+                        think=req.get("think"),
+                        one_shot=req.get("one_shot")
                     ))
 
             case _:

@@ -283,41 +283,52 @@ class Friday(Voice, Memory):
         prompt: str, 
         images: Optional[list[str]] = None, 
         audio: Optional[list[str]] = None,
+        model: Optional[str] = None,
+        think: Optional[bool] = None,
         stream: bool = True,
+        silent: bool = False,
         notify_content: bool = False,
         say_thinking_quote: bool = True,
-        silent: bool = False,
-        model: Optional[str] = None,
-        think: Optional[bool] = None
+        one_shot: bool = False
     ) -> Generator[tuple[str, str]] | str:
-        self.shut_up()
+        
         generation = self.get_generation()
+        self.shut_up()
 
         def generator():
-            with self._reply_lock:
-                is_thinking = False
-                output = ""
+            memory_snapshot = None
 
-                for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model, think):
-                    if chunk_t == "thinking" and not is_thinking:
-                        if not silent and say_thinking_quote:
-                            self.say(shared.random_thinking_quote())
-                        is_thinking = True
+            if one_shot:
+                memory_snapshot = self.wipe_context()
 
-                    if chunk_t == "response":
-                        if not silent:
-                            self.speak(chunk, generation)
-                        output += chunk
+            try:
+                with self._reply_lock:
+                    is_thinking = False
+                    output = ""
 
-                    yield chunk_t, chunk
+                    for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model, think):
+                        if chunk_t == "thinking" and not is_thinking:
+                            if not silent and say_thinking_quote:
+                                self.say(shared.random_thinking_quote())
+                            is_thinking = True
 
-                self.done_speaking(generation)
-                log.debug(f"context used: {self.context_used}/{self.context_total}")
-                
-                if notify_content:
-                    shared.notify("Reply from friday", output)
-                
-                return output
+                        if chunk_t == "response":
+                            if not silent:
+                                self.speak(chunk, generation)
+                            output += chunk
+
+                        yield chunk_t, chunk
+
+                    self.done_speaking(generation)
+                    log.debug(f"context used: {self.context_used}/{self.context_total}")
+                    
+                    if notify_content:
+                        shared.notify("Reply from friday", output)
+                    
+                    return output
+            finally:
+                if memory_snapshot is not None:
+                    self.restore_context(memory_snapshot)
 
         gen = generator()
 

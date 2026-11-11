@@ -35,8 +35,7 @@ class Memory:
         wipe_context = config.get("misc", "wipe_chat_on_daemon_startup", bool)
 
         if not os.path.exists(self._turns_file) or wipe_context:
-            with open(self._turns_file, "w") as f:
-                json.dump([], f)
+            self.__set_turns([])
 
         self.turns_length = 0
         self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
@@ -65,6 +64,10 @@ class Memory:
             out = json.load(f)
             self.turns_length = len(out)
             return out
+
+    def __set_turns(self, turns: list[dict]):
+        with open(self._turns_file, "w") as f:
+            json.dump(turns, f)
 
     def __append_turn(self, turn: dict):
         turns = self.__get_turns()
@@ -197,12 +200,17 @@ class Memory:
 
     def wipe_context(self, soft: bool = False):
         log.info("Wiping current context")
-        
-        with open(self._turns_file, "w") as f:
-            json.dump([], f)
+        previous_turns = self.__get_turns()
+
+        self.__set_turns([])
 
         if not soft:
             self._current_turn = None
+
+        return previous_turns
+
+    def restore_context(self, turns: list[dict]):
+        self.__set_turns(turns)
 
     def clean_memory(self):
         """
