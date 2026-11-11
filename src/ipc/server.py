@@ -142,7 +142,7 @@ def serve():
         os.chmod(SOCKET_PATH, 0o600)        
         os.chdir(os.getenv("HOME"))
 
-        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+        # TODO why sending a signal here? perhaps a request? 
         signal.signal(signal.SIGUSR1, lambda signum, frame: server.request_reload())
 
         log.info(f"Ready on {SOCKET_PATH}")

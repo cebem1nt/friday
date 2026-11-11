@@ -3,6 +3,9 @@ from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from src import config, shared
 
+from time import sleep as __sleep
+from urllib.parse import urlsplit as __urlsplit
+
 import subprocess, os, shutil, fnmatch, sys, base64
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
@@ -38,9 +41,10 @@ def __run(args: list[str]):
 def __popen(args: list[str]):
     return subprocess.Popen(
         args,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
 
 def __run_shell(cmd: str):
@@ -408,19 +412,52 @@ def run_shell(cmd: str):
         "stderr": out.stderr
     })
 
+def type_content(content: str):
+    """
+    Types/writes given content to user's active input field
+    """
+
+    if os.environ.get("WAYLAND_DISPLAY"):
+        command = ["wtype", content]
+    else:
+        command = ["xdotool", "type", "--clearmodifiers", content]
+
+    try:
+        proc = __run(command)
+        if proc.returncode != 0:
+            return f"{command[0]} failed!"
+    except FileNotFoundError:
+        return f"Could not type content {command[0]} is not installed!"
+
+    return "Content was typed successfully"
+
 def spawn_process(cmd: str):
     try:
-        __popen_shell(cmd)
+        proc = __popen_shell(cmd)
+        __sleep(1)
+
+        if proc.poll() is not None and proc.returncode != 0:
+            return f"Could not run: {proc.stderr.read()}"
+
         return "Process spawned"
-    except:
-        return "Could not spawn process!"
+    except Exception as e:
+        return f"Could not spawn: ({e})"
 
 def xdg_open(uri: str):
     """
     Open a file path or URL with its default desktop app.
     """
-    __popen_shell(f"xdg-open {uri}")
-    return __(f"{uri} was opened sucessfully!")
+    
+    if not __urlsplit(uri).scheme:
+        uri = os.path.expanduser(os.path.expandvars(uri))
+
+    proc = __popen(["xdg-open", uri])
+    __sleep(0.5)
+
+    if proc.poll() is not None and proc.returncode != 0:
+        return f"Could not run: {proc.stderr.read().strip()}"
+    
+    return f"{uri} was opened sucessfully!"
 
 def get_user_selection():
     if os.environ.get("WAYLAND_DISPLAY"):
@@ -514,8 +551,7 @@ def write_to_file(
     return f"Content was written to {path}"
 
 def change_directory(directory: str):
-    directory = os.path.expanduser(
-        os.path.expandvars(directory))
+    directory = os.path.expanduser(os.path.expandvars(directory))
 
     if not os.path.exists(directory):
         return "Directory does not exist"
@@ -566,71 +602,53 @@ def time_now():
 
 # TODO possibly more sophisticated reminders system
 
-def set_timer(
-    hours: int,
-    minutes: int, 
-    seconds: int,
-    content: str
-):
-    total = seconds + (minutes * 60) + (hours * 60 * 60) 
-    message = f"This is a message from timer - {content}"
+# def set_timer(
+#     hours: int,
+#     minutes: int, 
+#     seconds: int,
+#     content: str
+# ):
+#     total = seconds + (minutes * 60) + (hours * 60 * 60) 
+#     message = f"This is a message from timer - {content}"
 
-    try:
-        subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
-    except:
-        return "Could not set timer!"
+#     try:
+#         subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
+#     except:
+#         return "Could not set timer!"
 
-    return "Timer was set!"
+#     return "Timer was set!"
 
-def remind_at(
-    hours: int,
-    minutes: int, 
-    seconds: int,
-    content: str
-):
-    now = datetime.now()
-    target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
+# def remind_at(
+#     hours: int,
+#     minutes: int, 
+#     seconds: int,
+#     content: str
+# ):
+#     now = datetime.now()
+#     target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
 
-    if target <= now:
-        target += timedelta(days=1) # Won't survive if host turns off
+#     if target <= now:
+#         target += timedelta(days=1) # Won't survive if host turns off
 
-    message = f"This is a message from reminder - {content}"
+#     message = f"This is a message from reminder - {content}"
 
-    if shutil.which("at"):
-        try:
-            subprocess.run(
-                ["at", "-t", target.strftime("%Y%m%d%H%M.%S")],
-                input=f"{sys.argv[0]} -a '{message}'\n", 
-                text=True, 
-                check=True
-            )
-            return "Reminder was set!"
-        except (OSError, subprocess.CalledProcessError):
-            pass
+#     if shutil.which("at"):
+#         try:
+#             subprocess.run(
+#                 ["at", "-t", target.strftime("%Y%m%d%H%M.%S")],
+#                 input=f"{sys.argv[0]} -a '{message}'\n", 
+#                 text=True, 
+#                 check=True
+#             )
+#             return "Reminder was set!"
+#         except (OSError, subprocess.CalledProcessError):
+#             pass
 
-    try:
-        total = (target - now).total_seconds()
-        subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
-    except:
-        return "Could not set reminder!"
+#     try:
+#         total = (target - now).total_seconds()
+#         subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
+#     except:
+#         return "Could not set reminder!"
 
-    return "Reminder was set!"
+#     return "Reminder was set!"
 
-def type_content(content: str):
-    """
-    Types/writes given content to user's active input field
-    """
-
-    if os.environ.get("WAYLAND_DISPLAY"):
-        command = ["wtype", content]
-    else:
-        command = ["xdotool", "type", "--clearmodifiers", content]
-
-    try:
-        proc = __run(command)
-        if proc.returncode != 0:
-            return f"{command[0]} failed!"
-    except FileNotFoundError:
-        return f"Could not type content {command[0]} is not installed!"
-
-    return "Content was typed successfully"
