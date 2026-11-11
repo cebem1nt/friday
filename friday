@@ -39,24 +39,16 @@ if __name__ == "__main__":
     from src.ipc.client import FridayClient
     client = FridayClient()
 
-    if args.wipe:
-        client.wipe_context()
-        
-    if args.reload:
-        from src.shared import friday_server_reload
-        friday_server_reload()
-
-    if args.set_model:
-        client.set_model(args.set_model) 
-
-    if args.say:
-        client.say(args.say)
-
-    if args.converse:
-        client.converse(False)
+    if args.wipe:      client.wipe_context()
+    if args.reload:    client.reload()
+    if args.set_model: client.set_model(args.set_model) 
+    if args.say:       client.say(args.say)
+    if args.converse:  client.converse(stream=False)
 
     elif content := " ".join(args.content):
-        print(client.reply(
+        from src.cli import printmd
+
+        printmd(client.reply(
             content, 
             model=args.model,
             images=args.image, 

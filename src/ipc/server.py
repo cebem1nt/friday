@@ -1,42 +1,25 @@
-import os, json, socketserver, sys, socket, time, signal, threading
-
 from typing import Any, Generator, Optional
-
 from src import log, config
+
 from src.shared import (
-    SOCKET_PATH, 
-    LOCK_PATH, 
+    FRIDAY_SOCKET_PATH,  
+    FRIDAY_LOCK_PATH, 
     friday_server_is_running
 )
+
+log.info("Importing Friday, ollama...")
+from src.friday.friday import Friday
+
+import os, json, socketserver, socket, time, threading
 
 class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
     def __init__(self, *args, task_interval: int = 60, **kwargs):
         super().__init__(*args, **kwargs)
-        log.info("Importing Friday, ollama...")
-        from src.friday.friday import Friday
         self.fr = Friday()
-        self._Friday = Friday
         self.task_interval = task_interval
-
         self._next_task = time.monotonic() + task_interval
-        self._reload_requested = threading.Event()
-
-    def request_reload(self):
-        log.info("Got reload request")
-        self._reload_requested.set()
 
     def service_actions(self):
-        if self._reload_requested.is_set():
-            self._reload_requested.clear()
-            
-            try:
-                config.parse()
-                self.fr = self._Friday()
-                log.info("Friday reloaded")
-
-            except Exception:
-                log.error("Failed to reload!")
-        
         if time.monotonic() < self._next_task:
             return
 
@@ -68,8 +51,14 @@ class FridayServer(socketserver.StreamRequestHandler):
 
         self.__send_json({"type": "done"})
 
+    def __reload_friday(self):
+        config.parse() # re-parse config
+        self.server.fr = Friday()
+        log.info("Friday was reloaded")
+
     def __match_request(self, req: dict):
         match req.get("function"):
+            case "reload":         self.__response(self.__reload_friday())
             case "say":            self.__response(self.server.fr.say(req["text"]))
             case "set_model":      self.__response(self.server.fr.set_model(req["model"]))
             case "shut_up":        self.__response(self.server.fr.shut_up())
@@ -90,23 +79,23 @@ class FridayServer(socketserver.StreamRequestHandler):
                         req["prompt"],
                         req.get("images"),
                         req.get("audio"),
-                        silent=req.get("silent"),
-                        say_thinking_quote=req.get("say_thinking_quote"),
                         model=req.get("model"),
                         think=req.get("think"),
-                        one_shot=req.get("one_shot")
+                        silent=req.get("silent"),
+                        one_shot=req.get("one_shot"),
+                        say_thinking_quote=req.get("say_thinking_quote")
                     ))
                 else:
                     self.__response(self.server.fr.reply(
                         req["prompt"],
                         req.get("images"),
                         req.get("audio"),
-                        stream=False,
-                        silent=req.get("silent"),
-                        say_thinking_quote=req.get("say_thinking_quote"),
                         model=req.get("model"),
                         think=req.get("think"),
-                        one_shot=req.get("one_shot")
+                        silent=req.get("silent"),
+                        one_shot=req.get("one_shot"),
+                        say_thinking_quote=req.get("say_thinking_quote"),
+                        stream=False
                     ))
 
             case _:
@@ -127,6 +116,10 @@ class FridayServer(socketserver.StreamRequestHandler):
             except BrokenPipeError:
                 self.server.fr.unstage_turn()
 
+            except KeyError as e:
+                self.server.fr.unstage_turn()
+                self.__response_error(f"Required argument is missing: {e.args[0]}")
+
             except Exception as exc:
                 self.server.fr.unstage_turn()
                 self.__response_error(f"internal error: {exc}")
@@ -134,27 +127,23 @@ class FridayServer(socketserver.StreamRequestHandler):
 
 def serve():
     if friday_server_is_running():
-        print("Friday server is allready running!", file=sys.stderr)
-        exit(1)        
+        log.fatal("Friday server is already running")
 
-    with open(LOCK_PATH, "w") as f:
+    with open(FRIDAY_LOCK_PATH, "w") as f:
         f.write(str(os.getpid()))
 
-    if os.path.exists(SOCKET_PATH):
-        os.unlink(SOCKET_PATH)
+    if os.path.exists(FRIDAY_SOCKET_PATH):
+        os.unlink(FRIDAY_SOCKET_PATH)
         
-    with FridayThreadingUnixStreamServer(SOCKET_PATH, FridayServer) as server:
-        os.chmod(SOCKET_PATH, 0o600)        
+    with FridayThreadingUnixStreamServer(FRIDAY_SOCKET_PATH, FridayServer) as server:
+        os.chmod(FRIDAY_SOCKET_PATH, 0o600)        
         os.chdir(os.getenv("HOME"))
 
-        # TODO why sending a signal here? perhaps a request? 
-        signal.signal(signal.SIGUSR1, lambda signum, frame: server.request_reload())
-
-        log.info(f"Ready on {SOCKET_PATH}")
+        log.info(f"Ready on {FRIDAY_SOCKET_PATH}")
 
         try:
             server.serve_forever()
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             exit(0)
         finally:
-            os.unlink(SOCKET_PATH)
+            os.unlink(FRIDAY_SOCKET_PATH)

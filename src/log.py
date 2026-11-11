@@ -1,6 +1,5 @@
-import os
-
 from typing import Optional
+import os, sys
 
 _log_level = 4
 _log_file = None
@@ -51,3 +50,8 @@ def error(msg: str):
 def raw(msg: str):
     print(msg, flush=True)
     __log_to_file(msg)
+
+def fatal(msg: str):
+    print(f"[\x1B[0;31mFATAL\x1B[0m] {msg}", flush=True, file=sys.stderr)
+    __log_to_file(msg)
+    exit(1)

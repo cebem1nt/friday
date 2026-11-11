@@ -164,7 +164,6 @@ Speech recognition uses faster-whisper.
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `rich_formatting` | `true` | Enables rich terminal formatting for chat |
 | `web_search_provider` | `ddgs` | Web search backend: `none`, `ddgs`, `ollama`, or `searxng` |
 | `searxng_url` | `http://localhost:8888/` | SearXNG endpoint when using that provider |
 | `screenshot_cmd` | `~/.local/bin/screenshot` | Command Friday uses to take a screenshot when requested |

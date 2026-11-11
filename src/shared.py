@@ -2,10 +2,20 @@ from datetime import datetime
 from contextlib import contextmanager, closing
 from src import config
 
-import random, os, sqlite3, subprocess, sys, signal
+import random, os, sqlite3, subprocess, sys
 
-SOCKET_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.sock")
-LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
+CACHE_HOME = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache/"))
+CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config/"))
+
+FRIDAY_SOCKET_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.sock")
+FRIDAY_LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
+FRIDAY_CACHE_DIR = os.path.join(CACHE_HOME, "friday")
+FRIDAY_CONFIG_DIR = os.path.join(CONFIG_HOME, "friday")
+
+FRIDAY_CONFIG_PATHS = [
+    os.path.join(CONFIG_HOME, "friday", "config.ini"),
+    "/etc/friday/config.ini"
+]
 
 # From papirus icon theme
 # TODO pack these icons with friday (if it's okay)
@@ -147,10 +157,10 @@ def parse_duration(value: str) -> float:
     return amount * multipliers[unit]
 
 def friday_server_is_running():
-    if not os.path.exists(LOCK_PATH):
+    if not os.path.exists(FRIDAY_LOCK_PATH):
         return False
 
-    with open(LOCK_PATH) as f:
+    with open(FRIDAY_LOCK_PATH) as f:
         content = f.read()
 
         try:
@@ -160,13 +170,3 @@ def friday_server_is_running():
 
         except:
             return False
-
-def friday_server_reload():
-    if not friday_server_is_running():
-        return print("Friday server is not running!", file=sys.stderr)
-
-    with open(LOCK_PATH) as f:
-        pid = int(f.read())
-        os.kill(pid, signal.SIGUSR1)
-
-    print("Reload signal was sent")

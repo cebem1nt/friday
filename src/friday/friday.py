@@ -9,9 +9,8 @@ from src import config, log, shared
 
 import os, ollama, re, threading, psutil
 
-FRIDAY_CONFIG_DIR = os.path.expanduser("~/.config/friday/")
-SYSTEM_PROMPT_FILE = os.path.join(FRIDAY_CONFIG_DIR, "system_prompt.md")
-EXTRA_CONTEXT_FILE = os.path.join(FRIDAY_CONFIG_DIR, "extra_context.md")
+SYSTEM_PROMPT_FILE = os.path.join(shared.FRIDAY_CONFIG_DIR, "system_prompt.md")
+EXTRA_CONTEXT_FILE = os.path.join(shared.FRIDAY_CONFIG_DIR, "extra_context.md")
 
 class ModelSpecs:
     def __init__(self, model: str):
@@ -101,7 +100,7 @@ class Friday(Voice, Memory):
         self.wipe_persistent_prompts()
 
         system_prompt_file = SYSTEM_PROMPT_FILE
-        model_system_prompt_file = os.path.join(FRIDAY_CONFIG_DIR, self.model + '.md')
+        model_system_prompt_file = os.path.join(shared.FRIDAY_CONFIG_DIR, self.model + '.md')
 
         if os.path.exists(model_system_prompt_file):
             system_prompt_file = model_system_prompt_file
@@ -110,8 +109,7 @@ class Friday(Voice, Memory):
             content = f.read()
             
             if not content:
-                log.error("System prompt can not be empty!")
-                exit(1)
+                log.fatal("System prompt can not be empty!")
 
             self.add_system_prompt(content)
 
@@ -146,7 +144,7 @@ class Friday(Voice, Memory):
                 keep_alive=self.keep_alive
             )
 
-    def __stream_reply_call_tools(self, tool_calls: list[dict]):
+    def __reply_call_tools(self, tool_calls: list[dict]):
         for call in tool_calls:
             log.debug(f"__stream_reply_call_tools: tool_call -> {call}")
 
@@ -177,7 +175,7 @@ class Friday(Voice, Memory):
                 )                        
         
 
-    def __stream_reply(
+    def __reply(
         self, 
         prompt: str,
         images: Optional[list[str]] = None, 
@@ -198,7 +196,7 @@ class Friday(Voice, Memory):
         if not self.specs.audio: audio = None
             
         self.add_message(prompt, images=images, audio=audio)
-        log.debug(f"__stream_reply: got message -> {prompt}")
+        log.debug(f"__reply: got message -> {prompt}")
 
         for _ in range(self.max_tool_calls_rounds):
             self.prune_context()
@@ -253,11 +251,11 @@ class Friday(Voice, Memory):
                     return full_reply
                 
                 self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
-                self.__stream_reply_call_tools(tool_calls)
+                self.__reply_call_tools(tool_calls)
 
             except ollama.ResponseError as e:
-                # So, this is a big workaround, for our shitty rolling single chat aproach
-                # if ollama throws an error, sayn no "context size left", it looks like this: 
+                # So, this is a big workaround, for our rolling single chat aproach
+                # if ollama throws an error: no "context size left", it looks like this: 
                 #   request (4161 tokens) exceeds the available context size (4096 tokens), try increasing it (status code: 400) 
                 # We aint afraid of that, we ball and parse it, update self.context_used with that and
                 # on the next iteration self.prune_context() will do it's thing
@@ -268,7 +266,7 @@ class Friday(Voice, Memory):
                     raise
 
                 log.debug("got ollama.ResponseError, tokens size exceeded, update self.context_used")
-                self.context_used = int(match.group(1))
+                self.update_context_used(int(match.group(1)))
                 continue
 
             finally:
@@ -287,9 +285,9 @@ class Friday(Voice, Memory):
         think: Optional[bool] = None,
         stream: bool = True,
         silent: bool = False,
+        one_shot: bool = False,
         notify_content: bool = False,
-        say_thinking_quote: bool = True,
-        one_shot: bool = False
+        say_thinking_quote: bool = True
     ) -> Generator[tuple[str, str]] | str:
         
         generation = self.get_generation()
@@ -306,7 +304,7 @@ class Friday(Voice, Memory):
                     is_thinking = False
                     output = ""
 
-                    for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model, think):
+                    for chunk_t, chunk in self.__reply(prompt, images, audio, model, think):
                         if chunk_t == "thinking" and not is_thinking:
                             if not silent and say_thinking_quote:
                                 self.say(shared.random_thinking_quote())
@@ -342,10 +340,7 @@ class Friday(Voice, Memory):
             except StopIteration as result:
                 return result.value
 
-    def converse(
-        self, 
-        stream: bool = True
-    ) -> Generator[tuple[str, str]] | Optional[str]:
+    def converse(self, stream: bool = True) -> Generator[tuple[str, str]] | Optional[str]:
         if not self.is_listening():
             self.shut_up()
             self.listen()
@@ -355,13 +350,11 @@ class Friday(Voice, Memory):
         shared.notify("Friday is done listening", "Transcribing your audio...", True)
         prompt = self.done_listening()
         
-        if prompt:
-            shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
-            return self.reply(prompt, stream=stream, notify_content=True)
+        if not prompt:
+            shared.notify("Looks empty", "You didn't say anything, that's fine.")
 
-    def idle_actions(self):
-        self.kokoro.unload_if_idle()
-        self.whisper.unload_if_idle()
+        shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
+        return self.reply(prompt, stream=stream, notify_content=True)
 
     def add_extra_context(self, context: str):
         if not os.path.exists(EXTRA_CONTEXT_FILE):
@@ -386,3 +379,7 @@ class Friday(Voice, Memory):
         self.specs = ModelSpecs(model)
         self.__init_tools()
         self.__init_prompts()
+
+    def idle_actions(self):
+        self.kokoro.unload_if_idle()
+        self.whisper.unload_if_idle()

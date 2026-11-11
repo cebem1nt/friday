@@ -202,7 +202,7 @@ if USE_GOOGLE_TOOLS:
         creds = Credentials.from_authorized_user_file("token.json", API_SCOPES)
 
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        if creds and not creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(

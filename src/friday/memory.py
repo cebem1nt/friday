@@ -1,12 +1,9 @@
 from typing import Optional
 
-from src.shared import db
+from src.shared import db, FRIDAY_CACHE_DIR
 from src import log, config
 
 import os, json
-
-CACHE_HOME = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache/"))
-FRIDAY_CACHE_DIR = os.path.join(CACHE_HOME, "friday")
 
 def estimate_tokens(messages: list[dict]):
     text = 0
@@ -212,12 +209,6 @@ class Memory:
     def restore_context(self, turns: list[dict]):
         self.__set_turns(turns)
 
-    def clean_memory(self):
-        """
-        Forget current messages history / context
-        """
-        self.wipe_context(soft=True)
-
     def unstage_turn(self):
         if self._current_turn is None:
             return
@@ -226,3 +217,10 @@ class Memory:
 
     def update_context_used(self, used: int):
         self.context_used = used
+
+    # Used as a tool by model
+    def clean_memory(self):
+        """
+        Forget current messages history / context
+        """
+        self.wipe_context(soft=True)

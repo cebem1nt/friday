@@ -1,12 +1,8 @@
-import os
 from configparser import ConfigParser
+from src.shared import FRIDAY_CONFIG_PATHS
 from typing import Any
 
-CONFIG_HOME = os.path.expanduser("~/.config/")
-CONFIG_PATHS = [
-    os.path.join(os.getenv("XDG_CONFIG_HOME", CONFIG_HOME), "friday", "config.ini"),
-    "/etc/friday/config.ini"
-]
+import os
 
 _config = None
 
@@ -17,7 +13,7 @@ def parse():
         inline_comment_prefixes=("#")
     )
 
-    for config_path in CONFIG_PATHS:
+    for config_path in FRIDAY_CONFIG_PATHS:
         if os.path.exists(config_path):
             parser.read(config_path)
         

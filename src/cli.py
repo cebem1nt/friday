@@ -1,21 +1,16 @@
-import os, readline, random, sys, termios
+from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
 
 from contextlib import contextmanager
 from src import config
 from src.ipc.client import FridayClient
 from src.shared import friday_server_is_running
 
-try:
-    if not config.get("misc", "rich_formatting", bool):
-        raise ImportError
+import os, readline, random, sys, termios
 
-    from rich.console import Console
-    from rich.live import Live
-    from rich.markdown import Markdown
-    
-    USE_RICH = True
-except ImportError:
-    USE_RICH = False
+def printmd(content: str):
+    Console().print(Markdown(content))
 
 @contextmanager
 def no_stdin_echo():
@@ -34,7 +29,7 @@ class CLI:
     def __init__(self, friday_client: FridayClient):
         self.fr = friday_client
 
-    def __ask_rich(self, prompt: str):
+    def ask(self, prompt: str):
         console = Console()
         content = ""
         
@@ -56,17 +51,6 @@ class CLI:
                 
                 live.update(Markdown(content))
 
-    def __ask_no_rich(self, prompt: str):
-        is_thinking = False
-
-        for chunk_type, chunk in self.fr.reply(prompt):
-            if chunk_type == "thinking" and not is_thinking:
-                print("Thinking...")
-                is_thinking = True
-            else:
-                print(chunk, flush=True, end='')
-        print()
-
     def chat(self):
         if not friday_server_is_running():
             return print("Friday server is not running", file=sys.stderr)
@@ -81,10 +65,7 @@ class CLI:
                 print(f">> {content}")
                 continue
 
-            if USE_RICH:
-                Console().print(Markdown(content))
-            else:
-                print(content)
+            printmd(content)
 
         while True:
             try:
@@ -114,10 +95,7 @@ class CLI:
 
             try:
                 with no_stdin_echo():
-                    if USE_RICH: 
-                        self.__ask_rich(prompt)
-                    else: 
-                        self.__ask_no_rich(prompt)
+                    self.ask(prompt)
                         
             except (EOFError, KeyboardInterrupt):
                 self.fr.shut_up()

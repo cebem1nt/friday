@@ -1,7 +1,7 @@
 import socket, os, json
 from contextlib import contextmanager
 
-from src.shared import SOCKET_PATH, friday_server_is_running
+from src.shared import FRIDAY_SOCKET_PATH, friday_server_is_running
 from typing import Any, BinaryIO, Optional, Generator
 
 class FridayClient:
@@ -11,7 +11,7 @@ class FridayClient:
             raise RuntimeError("Friday server is not running")
 
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.connect(SOCKET_PATH)
+            s.connect(FRIDAY_SOCKET_PATH)
             with s.makefile("rwb") as stream:
                 yield stream
 
@@ -47,12 +47,12 @@ class FridayClient:
         prompt: str,
         images: Optional[list[str]] = None, 
         audio: Optional[list[str]] = None,
-        stream: bool = True,
-        say_thinking_quote: bool = True,
-        silent: bool = False,
         model: Optional[str] = None,
         think: Optional[bool] = None,
-        one_shot: bool = False
+        stream: bool = True,
+        silent: bool = False,
+        one_shot: bool = False,
+        say_thinking_quote: bool = True,
     ) -> Generator[tuple[str, str]] | str:
         if images:
             images = [os.path.realpath(img) for img in images]
@@ -99,12 +99,12 @@ class FridayClient:
     def shut_up(self):
         with self.connection() as con:
             self.__send_json({"function": "shut_up"}, con)
-            self.__get_response(con)
+            return self.__get_response(con)
 
     def wipe_context(self):
         with self.connection() as con:
             self.__send_json({"function": "wipe_context" }, con)
-            self.__get_response(con)
+            return self.__get_response(con)
 
     def say(self, text: str):
         with self.connection() as con:
@@ -113,7 +113,7 @@ class FridayClient:
                 "text": text
             }, con)
             
-            self.__get_response(con) 
+            return self.__get_response(con) 
 
     def set_model(self, model: str):
         with self.connection() as con:
@@ -127,7 +127,7 @@ class FridayClient:
     def listen(self):
         with self.connection() as con:
             self.__send_json({"function": "listen"}, con)
-            self.__get_response(con)
+            return self.__get_response(con)
 
     def done_listening(self) -> str:
         with self.connection() as con:
@@ -137,4 +137,9 @@ class FridayClient:
     def get_messages(self) -> dict:
         with self.connection() as con:
             self.__send_json({"function": "get_messages"}, con)
+            return self.__get_response(con).get("response") 
+
+    def reload(self) -> dict:
+        with self.connection() as con:
+            self.__send_json({"function": "reload"}, con)
             return self.__get_response(con).get("response") 
