@@ -182,7 +182,8 @@ class Friday(Voice, Memory):
         prompt: str,
         images: Optional[list[str]] = None, 
         audio: Optional[list[str]] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        think: Optional[bool] = None
     ):
         previous_model = None
 
@@ -190,9 +191,12 @@ class Friday(Voice, Memory):
             previous_model = self.model
             self.set_model(model)      
 
+        if think is None:
+            think = self.think
+
         if not self.specs.vision: images = None
         if not self.specs.audio: audio = None
-
+            
         self.add_message(prompt, images=images, audio=audio)
         log.debug(f"__stream_reply: got message -> {prompt}")
 
@@ -203,7 +207,7 @@ class Friday(Voice, Memory):
                 stream=True,
                 model=self.model,
                 messages=self.get_messages(),
-                think=self.think,
+                think=think if self.specs.thinking else None,
                 tools=self.tools.values() if self.tools else None,
                 keep_alive=config.get("ai", "keep_alive"),
                 options={ "num_ctx": self.context_total }
@@ -283,7 +287,8 @@ class Friday(Voice, Memory):
         notify_content: bool = False,
         say_thinking_quote: bool = True,
         silent: bool = False,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        think: Optional[bool] = None
     ) -> Generator[tuple[str, str]] | str:
         self.shut_up()
         generation = self.get_generation()
@@ -293,7 +298,7 @@ class Friday(Voice, Memory):
                 is_thinking = False
                 output = ""
 
-                for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model):
+                for chunk_t, chunk in self.__stream_reply(prompt, images, audio, model, think):
                     if chunk_t == "thinking" and not is_thinking:
                         if not silent and say_thinking_quote:
                             self.say(shared.random_thinking_quote())

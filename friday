@@ -6,22 +6,24 @@ from src import log
 if __name__ == "__main__": 
     p = argparse.ArgumentParser(description="Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.")
 
-    p.add_argument("--serve",            action="store_true", help="start friday IPC server")
     p.add_argument("-l",  "--log-level", type=int, default=2, help="log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.")
     p.add_argument("-lf", "--log-file",  help="duplicate logs to this file")
 
-    p.add_argument("-a", "--ask",         help="ask friday given content (pass as single argument)")
-    p.add_argument("-m", "--model",       help="answer given question using this model")
+    p.add_argument("content", metavar="[CONTENT]", nargs=argparse.REMAINDER, help="content to send to Friday")
+    p.add_argument("-m", "--model",       help="answer given content using this model")
     p.add_argument("-M", "--set-model",   help="set model to given one at runtime without server reloading")
-    p.add_argument("-I", "--image",       nargs='+',  help="attach these image[s]. use with --ask")
-    p.add_argument("-A", "--audio",       nargs='+',  help="attach audio. use with --ask")
+    p.add_argument("-I", "--image",       nargs='+', help="attach these image[s]")
+    p.add_argument("-A", "--audio",       nargs='+', help="attach audio")
     p.add_argument("-s", "--silent",      action="store_true", help="do not speak responses aloud")
-    p.add_argument("--no-thinking-quote", action="store_true", help="just don't say random thinking quote")
 
     p.add_argument("-c", "--converse", action="store_true", help="start recording audio, when run once more - stop recording and get response from friday")
     p.add_argument("-w", "--wipe",     action="store_true", help="wipe current friday context")
     p.add_argument("-r", "--reload",   action="store_true", help="reload running friday server (reloads config, restarts everything). Note that some of the settings might still need a full server restart")
-    p.add_argument("--say",            help="make friday say given text")
+    
+    p.add_argument("--think",               action=argparse.BooleanOptionalAction, help="enable or disable thinking")
+    p.add_argument("--no-thinking-quote",   action="store_true", help="just don't say random thinking quote")
+    p.add_argument("--serve",               action="store_true", help="start friday IPC server")
+    p.add_argument("--say", metavar="TEXT", help="make friday say given text")
 
     args = p.parse_args()
 
@@ -52,15 +54,16 @@ if __name__ == "__main__":
     if args.converse:
         client.converse(False)
 
-    elif args.ask:
+    elif content := " ".join(args.content):
         print(client.reply(
-            args.ask, 
+            content, 
             model=args.model,
             images=args.image, 
             audio=args.audio,
             silent=args.silent,
             stream=False,
-            say_thinking_quote=not args.no_thinking_quote
+            say_thinking_quote=not args.no_thinking_quote,
+            think=args.think
         ))
 
     elif len(sys.argv) == 1:

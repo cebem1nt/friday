@@ -50,7 +50,8 @@ class FridayClient:
         stream: bool = True,
         say_thinking_quote: bool = True,
         silent: bool = False,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        think: Optional[bool] = None
     ) -> Generator[tuple[str, str]] | str:
         if images:
             images = [os.path.realpath(img) for img in images]
@@ -66,7 +67,8 @@ class FridayClient:
             "stream": stream,
             "say_thinking_quote": say_thinking_quote,
             "silent": silent,
-            "model": model
+            "model": model,
+            "think": think
         }
 
         if stream:
