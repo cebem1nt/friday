@@ -71,6 +71,7 @@ class FridayServer(socketserver.StreamRequestHandler):
     def __match_request(self, req: dict):
         match req.get("function"):
             case "say":            self.__response(self.server.fr.say(req["text"]))
+            case "set_model":      self.__response(self.server.fr.set_model(req["model"]))
             case "shut_up":        self.__response(self.server.fr.shut_up())
             case "wipe_context":   self.__response(self.server.fr.wipe_context())
             case "listen":         self.__response(self.server.fr.listen())

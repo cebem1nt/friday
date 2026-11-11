@@ -236,6 +236,7 @@ Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to p
 
 ## TODOS
 
+- [ ] Improve IPC comunication, better schema
 - [ ] More handling for runtime model change + improve reloading
 - [ ] GUI in GTK 
 - [x] Per model system prompt support

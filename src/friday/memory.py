@@ -113,6 +113,12 @@ class Memory:
             "content": content
         })
 
+    def wipe_system_prompts(self):
+        self._system_prompts = []
+
+    def wipe_persistent_prompts(self):
+        self.persistent_prompts = []
+
     def add_persistent_prompt(
         self, 
         content: str,
@@ -159,9 +165,9 @@ class Memory:
 
         if finish_turn:
             self.finish_turn()
-            self.prune()
+            self.prune_context()
 
-    def prune(self):        
+    def prune_context(self):        
         removable = max(0, self.turns_length - self.keep_recent_turns)
         turns = self.__get_turns()
 

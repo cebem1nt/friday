@@ -62,15 +62,18 @@ class Friday(Voice, Memory):
             for future in futures:
                 future.result()
 
-        if not self.specs.tools:
-            log.warn("Tools aren't supported by the model")
-
-        elif config.get("ai", "use_tools", bool):
-            self.__init_tools()
-
+        self.__init_tools()
         self.__init_prompts()
 
     def __init_tools(self):
+        if not self.specs.tools:
+            log.warn("Tools aren't supported by the model")
+            return
+
+        if not config.get("ai", "use_tools", bool):
+            log.info("Tools are disabled")
+            return
+
         from src.friday import tools # Triggers tools re-init too with -r
 
         self.tools = { 
@@ -94,6 +97,9 @@ class Friday(Voice, Memory):
         log.debug(f"tools: {pformat(self.tools, 2, compact=False)}")
 
     def __init_prompts(self):
+        self.wipe_system_prompts()
+        self.wipe_persistent_prompts()
+
         system_prompt_file = SYSTEM_PROMPT_FILE
         model_system_prompt_file = os.path.join(FRIDAY_CONFIG_DIR, self.model + '.md')
 
@@ -178,8 +184,11 @@ class Friday(Voice, Memory):
         audio: Optional[list[str]] = None,
         model: Optional[str] = None
     ):
-        if not model:
-            model = self.model
+        previous_model = None
+
+        if model is not None:
+            previous_model = self.model
+            self.set_model(model)      
 
         if not self.specs.vision: images = None
         if not self.specs.audio: audio = None
@@ -188,11 +197,11 @@ class Friday(Voice, Memory):
         log.debug(f"__stream_reply: got message -> {prompt}")
 
         for _ in range(self.max_tool_calls_rounds):
-            self.prune()
+            self.prune_context()
 
             stream = ollama.chat(
                 stream=True,
-                model=model,
+                model=self.model,
                 messages=self.get_messages(),
                 think=self.think,
                 tools=self.tools.values() if self.tools else None,
@@ -247,7 +256,7 @@ class Friday(Voice, Memory):
                 # if ollama throws an error, sayn no "context size left", it looks like this: 
                 #   request (4161 tokens) exceeds the available context size (4096 tokens), try increasing it (status code: 400) 
                 # We aint afraid of that, we ball and parse it, update self.context_used with that and
-                # on the next iteration self.prune() will do it's thing
+                # on the next iteration self.prune_context() will do it's thing
 
                 match = re.search(r"\((\d+)\s+tokens\)", e.error)
 
@@ -257,6 +266,10 @@ class Friday(Voice, Memory):
                 log.debug("got ollama.ResponseError, tokens size exceeded, update self.context_used")
                 self.context_used = int(match.group(1))
                 continue
+
+            finally:
+                if previous_model is not None:
+                    self.set_model(previous_model)
 
         self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant", finish_turn=True)
         yield "system", "Stopped, tool-call limit was hit"
@@ -350,3 +363,10 @@ class Friday(Voice, Memory):
                 self.add_persistent_prompt(content)
 
         return "Context file was updated"
+
+    def set_model(self, model: str):
+        log.info(f"Setting model to {model}")
+        self.model = model
+        self.specs = ModelSpecs(model)
+        self.__init_tools()
+        self.__init_prompts()

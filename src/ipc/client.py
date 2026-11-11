@@ -111,6 +111,15 @@ class FridayClient:
             
             self.__get_response(con) 
 
+    def set_model(self, model: str):
+        with self.connection() as con:
+            self.__send_json({
+                "function": "set_model",
+                "model": model
+            }, con)
+            
+            return self.__get_response(con) 
+
     def listen(self):
         with self.connection() as con:
             self.__send_json({"function": "listen"}, con)
