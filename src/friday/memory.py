@@ -209,3 +209,6 @@ class Memory:
             return
 
         self._current_turn = None
+
+    def update_context_used(self, used: int):
+        self.context_used = used

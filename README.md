@@ -238,5 +238,6 @@ Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to p
 
 - [ ] More handling for runtime model change + improve reloading
 - [ ] GUI in GTK 
+- [x] Per model system prompt support
 - [x] Integrations with gmail, google calendar
 - [x] Improved chat context management - sort of additional old chats summary prompt 

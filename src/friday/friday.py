@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from inspect import getmembers, isfunction
-from typing import Generator, Optional
+from typing import Generator, Optional, Any
 from pprint import pformat
 
 from src.friday.voice import Voice
@@ -9,8 +9,9 @@ from src import config, log, shared
 
 import os, ollama, re, threading, psutil
 
-SYSTEM_PROMPT_FILE = os.path.expanduser("~/.config/friday/system_prompt.md")
-EXTRA_CONTEXT_FILE = os.path.expanduser("~/.config/friday/extra_context.md")
+FRIDAY_CONFIG_DIR = os.path.expanduser("~/.config/friday/")
+SYSTEM_PROMPT_FILE = os.path.join(FRIDAY_CONFIG_DIR, "system_prompt.md")
+EXTRA_CONTEXT_FILE = os.path.join(FRIDAY_CONFIG_DIR, "extra_context.md")
 
 class ModelSpecs:
     def __init__(self, model: str):
@@ -34,8 +35,8 @@ class Friday(Voice, Memory):
         self.keep_alive = config.get("ai", "keep_alive")
         self.model = config.get("ai", "model")
         self.specs = ModelSpecs(self.model)
-        self.tools = {}
         self.think = config.get("ai", "think", bool)
+        self.tools = {}
         self._reply_lock = threading.Lock()
 
         if not self.specs.thinking:
@@ -61,40 +62,59 @@ class Friday(Voice, Memory):
             for future in futures:
                 future.result()
 
-        self.add_system_prompt(f"Date today: {shared.today()}")
-
-        with open(SYSTEM_PROMPT_FILE) as f:
-            self.add_system_prompt(f.read())
-
-        if config.get("ai", "use_tools", bool) and self.specs.tools:
-            from src.friday import tools # Triggers tools re-init too with -r
-
-            self.tools = { 
-                name: func
-                for name, func in getmembers(tools, isfunction)
-                    if not name.startswith("__")
-            }
-
-            self.tools["clean_memory"] = self.clean_memory 
-            self.tools["add_extra_context"] = self.add_extra_context 
-
-            if config.get("misc", "web_search_provider") == "none":
-                self.tools.pop("web_search")
-                self.tools.pop("web_fetch")
-            else:
-                log.info("Friday: Web search is enabled")
-                
-            log.debug(f"tools: {pformat(self.tools, 2, compact=False)}")
-
-        elif not self.specs.tools:
+        if not self.specs.tools:
             log.warn("Tools aren't supported by the model")
 
-        # This one must be added as the latest prompt
+        elif config.get("ai", "use_tools", bool):
+            self.__init_tools()
+
+        self.__init_prompts()
+
+    def __init_tools(self):
+        from src.friday import tools # Triggers tools re-init too with -r
+
+        self.tools = { 
+            name: func
+            for name, func in getmembers(tools, isfunction)
+                if not name.startswith("__")
+        }
+
+        self.tools["clean_memory"] = self.clean_memory 
+        self.tools["add_extra_context"] = self.add_extra_context 
+
+        if tools.WEB_SEARCH_PROVIDER != "none":
+            log.info("Friday: Web search is enabled")
+        
+        if not self.specs.vision:
+            self.tools.pop("look_at_the_screen")
+
+        if not (self.specs.vision and self.specs.audio):
+            self.tools.pop("view_media")
+
+        log.debug(f"tools: {pformat(self.tools, 2, compact=False)}")
+
+    def __init_prompts(self):
+        system_prompt_file = SYSTEM_PROMPT_FILE
+        model_system_prompt_file = os.path.join(FRIDAY_CONFIG_DIR, self.model + '.md')
+
+        if os.path.exists(model_system_prompt_file):
+            system_prompt_file = model_system_prompt_file
+
+        with open(system_prompt_file) as f:
+            content = f.read()
+            
+            if not content:
+                log.error("System prompt can not be empty!")
+                exit(1)
+
+            self.add_system_prompt(content)
+
+        self.add_system_prompt(f"Date today: {shared.today()}")
+
         if os.path.exists(EXTRA_CONTEXT_FILE):
             with open(EXTRA_CONTEXT_FILE) as f:
                 if content := f.read():
                     self.add_persistent_prompt(content, "assistant")
-
 
     def __preload_model(self):
         if not config.get("ai", "preload", bool):
@@ -120,6 +140,37 @@ class Friday(Voice, Memory):
                 keep_alive=self.keep_alive
             )
 
+    def __stream_reply_call_tools(self, tool_calls: list[dict]):
+        for call in tool_calls:
+            log.debug(f"__stream_reply_call_tools: tool_call -> {call}")
+
+            name = call["function"]["name"]
+            args = call["function"]["arguments"]
+
+            function = self.tools.get(name)
+
+            if function is None:
+                result = f"Unknown tool: {name}"
+            else:
+                result = function(**args)
+
+            log.debug(f"tool response -> {result}")
+
+            if result is None: # If function did not return anything
+                result = "Sucess"
+
+            if isinstance(result, str):
+                self.add_message(result, role="tool", tool_name=name)
+            else:
+                self.add_message(
+                    result["content"], 
+                    role="tool", 
+                    images=result.get("images"),
+                    audio=result.get("audio"),
+                    tool_name=name
+                )                        
+        
+
     def __stream_reply(
         self, 
         prompt: str,
@@ -127,17 +178,14 @@ class Friday(Voice, Memory):
         audio: Optional[list[str]] = None,
         model: Optional[str] = None
     ):
-        if not self.specs.vision:
-            images = None
-            
-        if not self.specs.audio:
-            audio = None
+        if not model:
+            model = self.model
+
+        if not self.specs.vision: images = None
+        if not self.specs.audio: audio = None
 
         self.add_message(prompt, images=images, audio=audio)
         log.debug(f"__stream_reply: got message -> {prompt}")
-        
-        if not model:
-            model = self.model
 
         for _ in range(self.max_tool_calls_rounds):
             self.prune()
@@ -162,7 +210,7 @@ class Friday(Voice, Memory):
                     msg = chunk.message
 
                     if chunk.done:
-                        self.context_used = chunk.prompt_eval_count + chunk.eval_count
+                        self.update_context_used(chunk.prompt_eval_count + chunk.eval_count)
 
                     if msg.content:
                         full_reply += msg.content
@@ -185,40 +233,14 @@ class Friday(Voice, Memory):
 
                 if not tool_calls:
                     self.add_message(full_reply, role="assistant", finish_turn=True)
+
                     if log_thinking and full_thinking:
                         log.raw('\nThinking log:\n' + full_thinking + '\n')
                         
                     return full_reply
                 
                 self.add_message(full_reply, role="assistant", tool_calls=tool_calls)
-
-                for call in tool_calls:
-                    log.debug(f"__stream_reply: tool_call -> {call}")
-
-                    name = call["function"]["name"]
-                    arguments = call["function"]["arguments"]
-                    function = self.tools.get(name)
-
-                    if function is None:
-                        result = f"Unknown tool: {name}"
-                    else:
-                        result = function(**arguments)
-
-                    log.debug(f"tool response -> {result}")
-
-                    if result is None: # If function did not return anything
-                        result = "Sucess"
-
-                    if isinstance(result, str):
-                        self.add_message(result, role="tool", tool_name=name)
-                    else:
-                        self.add_message(
-                            result["content"], 
-                            role="tool", 
-                            images=result.get("images"),
-                            audio=result.get("audio"),
-                            tool_name=name
-                        )                        
+                self.__stream_reply_call_tools(tool_calls)
 
             except ollama.ResponseError as e:
                 # So, this is a big workaround, for our shitty rolling single chat aproach
