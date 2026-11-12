@@ -1,0 +1,11 @@
+[Unit]
+Description=Friday daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/fridayd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

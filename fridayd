@@ -25,4 +25,4 @@ fi
 source .venv/bin/activate
 mkdir -p "$HOME/.cache/friday/"
 
-exec ./friday --serve --log-level=4
+exec ./friday --serve --log-level=3

@@ -18,103 +18,10 @@ Friday can:
 - Remember settings and useful details over time
 - Call you boss, Tony
 
-## Requirements
-
-- Linux
-- uv (for setup)
-- [Ollama](https://github.com/ollama/ollama)
-
-Example configuration uses the Ollama model `gemma4:e4b`. Make sure the model is available in Ollama before starting Friday:
-
-```sh
-ollama pull gemma4:e4b
-```
-
-## Setup
-
-<details open>
-  <summary>System wide installation</summary>
-
-General instalation:
-
-```sh
-sudo make install
-```
-
-*If you need multi-language support, GPU runtime for TTS and speech-to-text:*
-
-```sh
-sudo make install EXTRAS="lang gpu"
-```
-
-Uninstall with:
-
-```sh
-sudo make uninstall
-```
-
-</details>
-
-<details>
-  <summary>Local setup</summary>
-
-If you need basic features only:
-
-```sh
-uv sync --locked
-```
-
-*If you need multi-language support:*
-
-```sh
-uv sync --locked --extra lang
-```
-
-*If you need GPU runtime for TTS and speech-to-text:*
-
-```sh
-uv sync --locked --extra gpu
-```
-
-</details>
-
-
-### Configuration, system prompts
-
-Then copy default config and system prompt to `~/.config/friday/`:
-
-```sh
-mkdir -p ~/.config/friday/
-cp assets/config.ini ~/.config/friday/
-cp assets/system_prompt.md ~/.config/friday/
-```
-
-### Voices
-
-Run this to setup voices for friday: 
-
-```sh
-cd ~/.config/friday/
-mkdir voices
-
-curl -L -o voices/kokoro-v1.0.onnx \
-  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx
-
-curl -L -o voices/voices-v1.0.bin \
-  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
-```
-
 ## Usage
 
-Firstly you have to startup friday daemon, you can start daemon via:
-
-```sh
-# Ensure ollama is running 
-fridayd
-```
-
-> [!TIP]
-> You can startup it according to the preferred way of your window manager / DE or via ***systemd service***
+> [!IMPORTANT]
+> Friday needs a running daemon, you can install it as a sytemd user service (see [installation](#installation)), or startup it manully by running `fridayd`
 
 You can chat with friday from cli:
 
@@ -146,42 +53,78 @@ friday -w
 > [!NOTE]
 > You can configure the way friday manages it's context in `~/.config/friday/config.ini`
 
-### Other commands:
+## Installation
 
+Requirements:
+
+- uv (for setup)
+- [Ollama](https://github.com/ollama/ollama)
+
+Example configuration uses `gemma4:e4b` ollama model. Make sure the model is available before starting Friday:
+
+```sh
+ollama pull gemma4:e4b
 ```
-usage: friday [-h] [--serve] [-l LOG_LEVEL] [-m MODEL] [-I IMAGE [IMAGE ...]] [-A AUDIO [AUDIO ...]] [-s] [-o] [--think | --no-think] [-M SET_MODEL] [-c] [-w] [-r]
-              [--no-thinking-quote] [--say TEXT]
-              
-Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.
 
-positional arguments:
-  [CONTENT]             content to send to Friday
+<details open>
+  <summary><h3>System wide installation</h3></summary>
 
-options:
-  -h, --help            show this help message and exit
-  --serve               start friday IPC server
-  -l, --log-level LOG_LEVEL
-                        log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.
-  -m, --model MODEL     answer given content using this model
-  -I, --image IMAGE [IMAGE ...]
-                        attach these image[s]
-  -A, --audio AUDIO [AUDIO ...]
-                        attach audio
-  -s, --silent          do not speak responses aloud
-  -o, --one-shot        answer given content in an empty context, do not store in history afterwards
-  --think, --no-think   enable or disable thinking (overwrites config default)
-  -M, --set-model SET_MODEL
-                        set model to given one at runtime without server reloading
-  -c, --converse        start recording audio, when run once more - stop recording and get response from friday
-  -w, --wipe            wipe current friday context
-  -r, --reload          reload running friday server (reloads config, restarts everything). Note that some of the settings might still need a full server restart
-  --no-thinking-quote   just don't say random thinking quote
-  --say TEXT            make friday say given text
+In order to setup everything and install `friday` and `fridayd` (will also install and startup a systemd service for friday daemon): 
+
+```sh
+make install
 ```
+
+> [!NOTE]
+> 
+> *If you need multi-language support and GPU runtime for TTS and speech-to-text:* add these as EXTRAS
+> 
+> ```sh
+> make install EXTRAS="lang gpu"
+> ```
+
+Uninstall with:
+
+```sh
+make uninstall
+```
+
+</details>
+
+<details>
+  <summary><h3>Project setup / for development</h3></summary>
+
+If you need basic features only:
+
+```sh
+uv sync --locked
+```
+
+*If you need multi-language support:*
+
+```sh
+uv sync --locked --extra lang
+```
+
+*If you need GPU runtime for TTS and speech-to-text:*
+
+```sh
+uv sync --locked --extra gpu
+```
+
+#### Configuration files, voices, system prompts
+
+Run this to install default config file, voices and system prompt
+
+```sh
+make install-misc
+```
+
+</details>
 
 ## Configuration
 
-Friday is configured via `.ini` config file, take a look at [`~/.config/friday/config.ini`](./assets/config.ini), it is well documented
+Friday is configured via `.ini` config file, take a look at [`~/.config/friday/config.ini`](./assets/config.ini), it is well documented. **After modifying config file, relaod friday daemon**, you can do it with `friday --reload`
 
 ### Ollama settings (`[ai]`)
 
@@ -302,6 +245,39 @@ Set `tts.prefer_cpu = false` to allow GPU use where supported. Set it to `true` 
 
 > [!WARNING]
 > GPU usage requires enough VRAM. if TTS or speech recognition does not work, try using CPU instead
+
+### Other commands:
+
+```
+usage: friday [-h] [--serve] [-l LOG_LEVEL] [-m MODEL] [-I IMAGE [IMAGE ...]] [-A AUDIO [AUDIO ...]] [-s] [-o] [--think | --no-think] [-M SET_MODEL] [-c] [-w] [-r]
+              [--no-thinking-quote] [--say TEXT]
+              
+Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.
+
+positional arguments:
+  [CONTENT]             content to send to Friday
+
+options:
+  -h, --help            show this help message and exit
+  --serve               start friday IPC server
+  -l, --log-level LOG_LEVEL
+                        log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.
+  -m, --model MODEL     answer given content using this model
+  -I, --image IMAGE [IMAGE ...]
+                        attach these image[s]
+  -A, --audio AUDIO [AUDIO ...]
+                        attach audio
+  -s, --silent          do not speak responses aloud
+  -o, --one-shot        answer given content in an empty context, do not store in history afterwards
+  --think, --no-think   enable or disable thinking (overwrites config default)
+  -M, --set-model SET_MODEL
+                        set model to given one at runtime without server reloading
+  -c, --converse        start recording audio, when run once more - stop recording and get response from friday
+  -w, --wipe            wipe current friday context
+  -r, --reload          reload running friday server (reloads config, restarts everything). Note that some of the settings might still need a full server restart
+  --no-thinking-quote   just don't say random thinking quote
+  --say TEXT            make friday say given text
+```
 
 ## TODOS
 
