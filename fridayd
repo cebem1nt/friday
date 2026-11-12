@@ -18,8 +18,8 @@ fi
 site="$(.venv/bin/python -c 'import site; print(site.getsitepackages()[0])')"
 export LD_LIBRARY_PATH="$site/nvidia/cublas/lib:$site/nvidia/cudnn/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-if [[ -e ".env" ]]; then
-    source .env # you might put OLLAMA_API_KEY there
+if [[ -e "$HOME/.config/friday/.env" ]]; then
+    source "$HOME/.config/friday/.env" # you might put OLLAMA_API_KEY there
 fi
 
 source .venv/bin/activate

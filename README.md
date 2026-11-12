@@ -1,6 +1,6 @@
 # Friday
 
-**A Linux local AI assistant that doesn't stop at conversation.** Talk to Friday, and it can search the web, open apps, run shell commands, work with your files and clipboard — all from your machine.
+**A local linux AI assistant that can actually get things done.** Talk to Friday, and it can search the web, open apps, run shell commands, work with your files and clipboard — all from your machine.
 
 Friday uses Ollama for AI, Whisper for speech recognition, and Kokoro for speech. It runs in the background as an IPC server, ready to help from the command line or your desktop.
 
@@ -21,6 +21,7 @@ Friday can:
 ## Requirements
 
 - Linux
+- uv (for setup)
 - [Ollama](https://github.com/ollama/ollama)
 
 Example configuration uses the Ollama model `gemma4:e4b`. Make sure the model is available in Ollama before starting Friday:
@@ -31,12 +32,54 @@ ollama pull gemma4:e4b
 
 ## Setup
 
-Setup with `uv`:
+<details open>
+  <summary>System wide installation</summary>
+
+General instalation:
 
 ```sh
-uv venv .venv
-uv pip install -r requirements.txt 
+sudo make install
 ```
+
+*If you need multi-language support, GPU runtime for TTS and speech-to-text:*
+
+```sh
+sudo make install EXTRAS="lang gpu"
+```
+
+Uninstall with:
+
+```sh
+sudo make uninstall
+```
+
+</details>
+
+<details>
+  <summary>Local setup</summary>
+
+If you need basic features only:
+
+```sh
+uv sync --locked
+```
+
+*If you need multi-language support:*
+
+```sh
+uv sync --locked --extra lang
+```
+
+*If you need GPU runtime for TTS and speech-to-text:*
+
+```sh
+uv sync --locked --extra gpu
+```
+
+</details>
+
+
+### Configuration, system prompts
 
 Then copy default config and system prompt to `~/.config/friday/`:
 
@@ -67,7 +110,7 @@ Firstly you have to startup friday daemon, you can start daemon via:
 
 ```sh
 # Ensure ollama is running 
-./fridayd
+fridayd
 ```
 
 > [!TIP]
@@ -76,13 +119,13 @@ Firstly you have to startup friday daemon, you can start daemon via:
 You can chat with friday from cli:
 
 ```sh
-./friday
+friday
 ```
 
 You also dictate a prompt to friday (push to talk), run `./friday --converse` once more to finish dictation
 
 ```sh
-./friday --converse
+friday --converse
 ```
 
 > [!TIP]
@@ -91,13 +134,13 @@ You also dictate a prompt to friday (push to talk), run `./friday --converse` on
 You can pass a question like this:
 
 ```sh
-./friday hey there, tell me my battery level
+friday hey there, tell me my battery level
 ```
 
 Friday has a single chat, it does not wipe the chat history until context window gets to small. It still stores all the messages in a database, so friday can remember things from past if you ask it to. If you want to cleanup active chat, use `-w` or `--wipe` or ask friday to wipe current chat history.
 
 ```sh
-./friday -w
+friday -w
 ```
 
 > [!NOTE]
@@ -247,21 +290,15 @@ Now re-run `fridayd`. A browser window will open so you can sign in as the test 
 
 **Testing-mode note:** Google limits Testing apps to listed test users, and authorizations for these scopes expire after seven days. You may need to authorize the app again weekly.
 
-## GPU support for speech
+## Nvidia GPU support for TTS
 
-For NVIDIA GPU execution with ONNX Runtime, install the GPU runtime:
-
-```sh
-uv pip install onnxruntime-gpu
-```
-
-On Arch Linux, install cudnn with:
+Install with `--extra gpu` dependencies, also you will need `cudnn` installed. On Arch Linux, install it with:
 
 ```sh
 sudo pacman -S cudnn
 ```
 
-Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to prefer CPU execution.
+Set `tts.prefer_cpu = false` to allow GPU use where supported. Set it to `true` to prefer CPU execution.
 
 > [!WARNING]
 > GPU usage requires enough VRAM. if TTS or speech recognition does not work, try using CPU instead

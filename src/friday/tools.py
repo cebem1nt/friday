@@ -192,26 +192,29 @@ if USE_GOOGLE_TOOLS:
         "https://www.googleapis.com/auth/calendar.readonly",
     ]
 
-    if not os.path.exists("credentials.json"):
+    CREDS_FILE = os.path.join(shared.FRIDAY_CONFIG_DIR, "credentials.json")
+    TOKEN_FILE = os.path.join(shared.FRIDAY_CACHE_DIR, "token.json")
+
+    if not os.path.exists(CREDS_FILE):
         raise FileNotFoundError(
             "In order to use google integrations, setup google OAauth project and save json credentials to credentials.json")
 
     creds = None
 
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", API_SCOPES)
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, API_SCOPES)
 
     if not creds or not creds.valid:
         if creds and not creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", API_SCOPES
+               CREDS_FILE, API_SCOPES
             )
 
             creds = flow.run_local_server(port=0)
 
-        with open("token.json", "w") as f:
+        with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
 
     gmail_api = __build_api("gmail", "v1", credentials=creds)

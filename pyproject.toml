@@ -1,0 +1,32 @@
+[project]
+name = "friday"
+version = "0.1.0"
+description = "A local linux AI assistant that can actually get things done."
+requires-python = ">=3.13,<3.14"
+
+dependencies = [
+    "sounddevice",
+    "faster-whisper",
+    "ollama",
+    "ddgs",
+    "psutil",
+    "kokoro-onnx",
+    "google-api-python-client",
+    "google-auth-httplib2",
+    "google-auth-oauthlib",
+]
+
+[project.optional-dependencies]
+
+lang = [
+    "misaki-fork[en]",
+]
+
+gpu = [
+    "onnxruntime-gpu",
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12==9.*",
+]
+
+[tool.uv]
+package = false
