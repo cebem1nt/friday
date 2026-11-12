@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 
 cd -- "$(dirname -- "$(realpath -- "$0")")"
 
@@ -22,9 +23,6 @@ if [[ -e ".env" ]]; then
 fi
 
 source .venv/bin/activate
-
 mkdir -p "$HOME/.cache/friday/"
 
-exec ./friday --serve \
-        --log-level=4 \
-        --log-file="$HOME/.cache/friday/friday.log"
+exec ./friday --serve --log-level=4 2>&1 | tee "$HOME/.cache/friday/friday.log"

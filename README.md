@@ -1,21 +1,26 @@
-# friday
+# Friday
 
-Friday is a fully local linux AI assistant that you can talk to. It can do pretty much everything a common AI chat app does but also interract with your machine. Friday uses [ollama](https://github.com/ollama/ollama), [whisper](https://github.com/openai/whisper), [kokoro](https://github.com/thewh1teagle/kokoro-onnx) and works as a background IPC server.
+**A Linux local AI assistant that doesn't stop at conversation.** Talk to Friday, and it can search the web, open apps, run shell commands, work with your files and clipboard — all from your machine.
 
-## Some of the things friday can do
+Friday uses Ollama for AI, Whisper for speech recognition, and Kokoro for speech. It runs in the background as an IPC server, ready to help from the command line or your desktop.
 
-- Search the internet
-- Open apps, open links in apps
+## Features
+
+Friday can:
+
+- Search the web for answers
+- Open apps and launch links in your default apps
 - Run shell commands
-- Read selected clipboard content and paste to the clipboard
-- Speak
-- Read / Write to files
-- Remember some settings long term
+- Read and write files
+- Work with your clipboard
+- Check Gmail, Google Tasks, and Calendar with optional Google integrations
+- Listen to voice prompts and speak its replies
+- Remember settings and useful details over time
+- Call you boss, Tony
 
 ## Requirements
 
 - Linux
-- Python 3.13
 - [Ollama](https://github.com/ollama/ollama)
 
 Example configuration uses the Ollama model `gemma4:e4b`. Make sure the model is available in Ollama before starting Friday:
@@ -26,11 +31,10 @@ ollama pull gemma4:e4b
 
 ## Setup
 
-Works only with python 3.13 as for now. Setup with `uv`:
+Setup with `uv`:
 
 ```sh
-uv python install 3.13
-uv venv --python 3.13 .venv
+uv venv .venv
 uv pip install -r requirements.txt 
 ```
 
@@ -67,7 +71,7 @@ Firstly you have to startup friday daemon, you can start daemon via:
 ```
 
 > [!TIP]
-> You can startup it acording to the preferred way of your winow manager / DE or via ***systemd service***
+> You can startup it according to the preferred way of your window manager / DE or via ***systemd service***
 
 You can chat with friday from cli:
 
@@ -84,13 +88,13 @@ You also dictate a prompt to friday (push to talk), run `./friday --converse` on
 > [!TIP]
 > Setup a key binding in your window manager / desktop environment to run `friday --converse`
 
-You can pass a single question using `-a` argument
+You can pass a question like this:
 
 ```sh
-./friday -a 'why is the sky blue?'
+./friday hey there, tell me my battery level
 ```
 
-Friday has a single chat, it does not wipe the chat history untill context window gets to small. It still stores all the messages in a database, so friday can rememeber things from past if you ask it to. If you want to cleanup active chat, use `-w` or `--wipe` or ask friday to wipe current chat history.
+Friday has a single chat, it does not wipe the chat history until context window gets to small. It still stores all the messages in a database, so friday can remember things from past if you ask it to. If you want to cleanup active chat, use `-w` or `--wipe` or ask friday to wipe current chat history.
 
 ```sh
 ./friday -w
@@ -100,26 +104,36 @@ Friday has a single chat, it does not wipe the chat history untill context windo
 > You can configure the way friday manages it's context in `~/.config/friday/config.ini`
 
 ### Other commands:
-```
-usage: friday [-h] [-a ASK] [-I IMAGE [IMAGE ...]] [-A AUDIO [AUDIO ...]] [-c] [-w] [-r] [-s SAY] {serve} ...
 
+```
+usage: friday [-h] [--serve] [-l LOG_LEVEL] [-m MODEL] [-I IMAGE [IMAGE ...]] [-A AUDIO [AUDIO ...]] [-s] [-o] [--think | --no-think] [-M SET_MODEL] [-c] [-w] [-r]
+              [--no-thinking-quote] [--say TEXT]
+              
 Friday is a fully local linux AI assistant. Run without arguments to start an interactive chat.
 
 positional arguments:
-  {serve}               available commands
-    serve               start friday IPC server
+  [CONTENT]             content to send to Friday
 
 options:
   -h, --help            show this help message and exit
-  -a, --ask ASK         ask friday given content (pass as single argument)
+  --serve               start friday IPC server
+  -l, --log-level LOG_LEVEL
+                        log verbosity from 0 (least output) to 4 (most output). Examples: 4 - includes debug, info, warnings, and errors, 2 - includes warnings and errors.
+  -m, --model MODEL     answer given content using this model
   -I, --image IMAGE [IMAGE ...]
-                        attach these image[s]. use with --ask
+                        attach these image[s]
   -A, --audio AUDIO [AUDIO ...]
-                        attach audio. use with --ask
+                        attach audio
+  -s, --silent          do not speak responses aloud
+  -o, --one-shot        answer given content in an empty context, do not store in history afterwards
+  --think, --no-think   enable or disable thinking (overwrites config default)
+  -M, --set-model SET_MODEL
+                        set model to given one at runtime without server reloading
   -c, --converse        start recording audio, when run once more - stop recording and get response from friday
   -w, --wipe            wipe current friday context
-  -r, --reload          reload running friday server (reloads config, restarts everything)
-  -s, --say SAY         make friday say given text
+  -r, --reload          reload running friday server (reloads config, restarts everything). Note that some of the settings might still need a full server restart
+  --no-thinking-quote   just don't say random thinking quote
+  --say TEXT            make friday say given text
 ```
 
 ## Configuration
@@ -132,7 +146,7 @@ Friday is configured via `.ini` config file, take a look at [`~/.config/friday/c
 |---|---|---|
 | `model` | `gemma4:e4b` | Ollama model used for chat |
 | `think` | `true` | Enables thinking when supported by the model |
-| `use_tools` | `true` | Allows the model to use tools (any kind of advanced interraction) |
+| `use_tools` | `true` | Allows the model to use tools (any kind of advanced interaction) |
 | `keep_alive` | `30m` | How long Ollama keeps the model loaded after a message |
 | `num_ctx` | `16384` | Maximum context window configured for the model |
 
@@ -173,19 +187,37 @@ Speech recognition uses faster-whisper.
 | `max_tool_response_length` | `20000` | Maximum tool response length in characters |
 | `max_response_trim_content` | `true` | Trims oversized tool responses to the configured limit |
 | `send_notifications` | `true` | Sends desktop notifications (requires `notify-send`) |
-| `log_thinking` | `false` | Logs the model’s thinking process when running the daemon |
+| `log_thinking` | `false` | Logs the model's thinking process when running the daemon |
 | `use_google_tools` | `false` | Enable google integrations. [See section below](#google-integrations--gmail-tasks-and-calendar) |
 | `wipe_chat_on_daemon_startup` | `false` | Clears the active chat when the daemon starts |
 
-The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama’s web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
+The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama's web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
 
 ### System prompt 
 
 You can also modify default system prompt in order to tweak friday behaviour. Take a look at [`~/.config/friday/system_prompt.md`](./assets/system_prompt.md)
 
+> [!TIP]
+> You can also add per-model system prompts, just save it to a markdown file with the model name - `~/.config/friday/gemma4:e2b.md`
+
+### Extra context
+
+Friday also supports an extra context (`~/.config/friday/extra_context.md`) - which is a file with additional prompt. Difference is that ***it does not have system level prompt importance***. Also, model can add content to it. You can add additional facts / commands to it, example content:
+
+```
+## Extra context
+
+- When user says good morning for the first time (do all of it in a nice brief manner):
+    1. get weather info with `run_shell("inxi -w --weather-unit m")`, summarize it, include current day of the week 
+    2. Check user's email, tasks and summarize them in a brief manner. 
+    3. Ask if calendar events wanted
+
+- To do any music related commands, use `playerctl` shell command. Read manual with `man playerctl`
+```
+
 ## Google integrations — Gmail, Tasks, and Calendar
 
-You can setup friday to read your latest emails, tasks and evenets from calendar, but it requires additional setup: 
+You can setup friday to read your latest emails, tasks and even events from calendar, but it requires additional setup: 
 
 ### 0. Enable google tools
 
@@ -205,7 +237,7 @@ Open each API page for your project and click **Enable**:
 
 ### 3. Configure the OAuth consent screen
 
-Open [Google Auth Platform](https://console.cloud.google.com/auth/overview) in your project. Configure the app’s name and contact email. Under **Audience**, choose **External** for a personal Gmail account and leave the app in **Testing**. Add the Gmail address you’ll sign in with under **Test users**.
+Open Google Auth Platform in your project. Configure the app's name and contact email. Under **Audience**, choose **External** for a personal Gmail account and leave the app in **Testing**. Add the Gmail address you'll sign in with under **Test users**.
 
 ### 4. Create and download an OAuth client
 
@@ -237,9 +269,9 @@ Set `prefer_cpu = false` to allow GPU use where supported. Set it to `true` to p
 ## TODOS
 
 - [ ] GUI in GTK 
-- [ ] Improve IPC comunication, better schema
 - [ ] Create normal packaging + systemd service
+- [x] Improve IPC communication, better schema
 - [x] More handling for runtime model change + improve reloading
 - [x] Per model system prompt support
 - [x] Integrations with gmail, google calendar
-- [x] Improved chat context management - sort of additional old chats summary prompt 
+- [x] Improved chat context management - sort of additional old chats summary prompt

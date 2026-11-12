@@ -33,7 +33,7 @@ class FridayServer(socketserver.StreamRequestHandler):
         self.wfile.flush()
 
     def __response(self, content: Optional[str]):
-        if content == None:
+        if content is None:
             content = "ok"
 
         self.__send_json({"response": content})

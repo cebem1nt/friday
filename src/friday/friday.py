@@ -341,20 +341,21 @@ class Friday(Voice, Memory):
                 return result.value
 
     def converse(self, stream: bool = True) -> Generator[tuple[str, str]] | Optional[str]:
-        if not self.is_listening():
-            self.shut_up()
-            self.listen()
-            shared.notify("Friday is listening", "Press again when done", True)
-            return None
+        with self._reply_lock:
+            if not self.is_listening():
+                self.shut_up()
+                self.listen()
+                shared.notify("Friday is listening", "Press again when done", True)
+                return None
 
-        shared.notify("Friday is done listening", "Transcribing your audio...", True)
-        prompt = self.done_listening()
-        
-        if not prompt:
-            shared.notify("Looks empty", "You didn't say anything, that's fine.")
+            shared.notify("Friday is done listening", "Transcribing your audio...", True)
+            prompt = self.done_listening()
+            
+            if not prompt:
+                shared.notify("Looks empty", "You didn't say anything, that's fine.")
 
-        shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
-        return self.reply(prompt, stream=stream, notify_content=True)
+            shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
+            return self.reply(prompt, stream=stream, notify_content=True)
 
     def add_extra_context(self, context: str):
         if not os.path.exists(EXTRA_CONTEXT_FILE):
