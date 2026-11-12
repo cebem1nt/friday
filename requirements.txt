@@ -2,11 +2,7 @@ sounddevice
 faster-whisper
 ollama
 ddgs
-misaki-fork[en]
 kokoro-onnx
-onnxruntime-gpu
-nvidia-cublas-cu12 
-nvidia-cudnn-cu12==9.*
 google-api-python-client 
 google-auth-httplib2 
 google-auth-oauthlib

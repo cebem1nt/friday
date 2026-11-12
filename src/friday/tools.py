@@ -205,17 +205,21 @@ if USE_GOOGLE_TOOLS:
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, API_SCOPES)
 
     if not creds or not creds.valid:
-        if creds and not creds.expired and creds.refresh_token:
+        if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-               CREDS_FILE, API_SCOPES
+                CREDS_FILE, API_SCOPES
             )
-
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(
+                port=0,
+                access_type="offline",
+                prompt="consent",
+            )
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
+
 
     gmail_api = __build_api("gmail", "v1", credentials=creds)
     calendar_api = __build_api("calendar", "v3", credentials=creds)
