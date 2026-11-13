@@ -1,6 +1,5 @@
 <h1 align="center">
-  <img src="assets/icons/friday.svg" alt="" width="50" style="vertical-align: middle;" />
-  <span style="vertical-align: middle;">Friday</span>
+  <img width="320" height="100" alt="friday" src="https://github.com/user-attachments/assets/53bdca8a-eb90-4335-b33e-df84f7440712" />
 </h1>
 
 <p align="center">
