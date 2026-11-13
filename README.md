@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>A local Linux AI assistant that can actually get things done.</strong><br />
-  Talk to Friday, and it can search the web, open apps, run shell commands, and work with your files and clipboard—all from your machine.
+  Talk to Friday, and it can search the web, open apps, run shell commands, work with your files, clipboard, all from your machine.
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@ You can chat with friday from cli:
 friday
 ```
 
-You also dictate a prompt to friday (push to talk), run `./friday --converse` once more to finish dictation
+You can also dictate a prompt to friday (push to talk), run `./friday --converse` once more to finish dictation
 
 ```sh
 friday --converse
@@ -49,7 +49,7 @@ friday --converse
 You can pass a question like this:
 
 ```sh
-friday hey there, tell me my battery level
+friday "hey there, what is my battery level?"
 ```
 
 Friday has a single chat, it does not wipe the chat history until context window gets to small. It still stores all the messages in a database, so friday can remember things from past if you ask it to. If you want to cleanup active chat, use `-w` or `--wipe` or ask friday to wipe current chat history.
@@ -68,10 +68,10 @@ Requirements:
 - uv (for setup)
 - [Ollama](https://github.com/ollama/ollama)
 
-Example configuration uses `gemma4:e4b` ollama model. Make sure the model is available before starting Friday:
+Example configuration uses `gemma4:e2b` ollama model. Make sure the model is available before starting Friday:
 
 ```sh
-ollama pull gemma4:e4b
+ollama pull gemma4:e2b
 ```
 
 <details open>
@@ -209,7 +209,7 @@ Follow these exact steps:
 You can also modify default system prompt in order to tweak friday behaviour. Take a look at [`~/.config/friday/system_prompt.md`](./assets/system_prompt.md)
 
 > [!TIP]
-> You can also add per-model system prompts, just save it to a markdown file with the model name - `~/.config/friday/gemma4:e2b.md`
+> You can also add per-model system prompts, just save it to a markdown file with the model name - `~/.config/friday/gemma4:e4b.md`
 
 ## Extra context
 
