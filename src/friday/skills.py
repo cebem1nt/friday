@@ -91,5 +91,3 @@ def get_skill(name: str) -> str:
         lines = f.read().splitlines()
         end = lines.index("---", 1)
         return "\n".join(lines[end + 1:]).lstrip()
-
-# TODO skill scripts are not supported yet, but are they necessary?

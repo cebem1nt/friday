@@ -14,6 +14,7 @@ Friday can:
 - Read and write files
 - Work with your clipboard
 - Check Gmail, Google Tasks, and Calendar with optional Google integrations
+- Run skills
 - Listen to voice prompts and speak its replies
 - Remember settings and useful details over time
 - Call you boss, Tony
@@ -179,24 +180,38 @@ Speech recognition uses faster-whisper.
 
 The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama's web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
 
-### System prompt 
+## Skills 
+
+Friday supports [Agent skills](https://agentskills.io/home), you can install skills to `~/.config/friday/skills/`. Example skill (save as ~/.config/friday/skills/good-morning/SKILL.md):
+
+```md
+---
+name: good-morning
+description: Actions user want's you to perform when he says good morning to you. Run this skill whenever user says good morning for the first time
+---
+
+# Morning routine
+
+Follow these exact steps:
+
+1. Get weather info with `run_shell("inxi -w --weather-unit m")`, sumarize it, include current day of the week 
+2. Check user's email, tasks and sumarize them in a brief maner. 
+3. Ask if calendar events wanted
+```
+
+## System prompt 
 
 You can also modify default system prompt in order to tweak friday behaviour. Take a look at [`~/.config/friday/system_prompt.md`](./assets/system_prompt.md)
 
 > [!TIP]
 > You can also add per-model system prompts, just save it to a markdown file with the model name - `~/.config/friday/gemma4:e2b.md`
 
-### Extra context
+## Extra context
 
 Friday also supports an extra context (`~/.config/friday/extra_context.md`) - which is a file with additional prompt. Difference is that ***it does not have system level prompt importance***. Also, model can add content to it. You can add additional facts / commands to it, example content:
 
 ```
 ## Extra context
-
-- When user says good morning for the first time (do all of it in a nice brief manner):
-    1. get weather info with `run_shell("inxi -w --weather-unit m")`, summarize it, include current day of the week 
-    2. Check user's email, tasks and summarize them in a brief manner. 
-    3. Ask if calendar events wanted
 
 - To do any music related commands, use `playerctl` shell command. Read manual with `man playerctl`
 ```
@@ -227,7 +242,7 @@ Open Google Auth Platform in your project. Configure the app's name and contact 
 
 ### 4. Create and download an OAuth client
 
-In Google Auth Platform, open **Clients**, choose **Create client**, and select **Desktop app**. Create the client, download its JSON file, and save it in friday project directory as `credentials.json`.
+In Google Auth Platform, open **Clients**, choose **Create client**, and select **Desktop app**. Create the client, download its JSON file, and save it to `~/.config/friday/` as `credentials.json`.
 
 Now re-run `fridayd`. A browser window will open so you can sign in as the test user and approve access.
 

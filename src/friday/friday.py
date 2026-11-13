@@ -314,9 +314,9 @@ class Friday(Voice, Memory):
         notify_content: bool = False,
         say_thinking_quote: bool = True
     ) -> Generator[tuple[str, str]] | str:
-        
-        generation = self.get_generation()
+
         self.shut_up()
+        generation = self.get_generation()
 
         def generator():
             memory_snapshot = None
