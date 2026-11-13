@@ -11,9 +11,7 @@
   Friday uses Ollama for AI, Whisper for speech recognition, and Kokoro for speech. It runs in the background as an IPC server, ready to help from the command line or your desktop.
 </p>
 
-## Features
-
-Friday can:
+## Friday can:
 
 - Search the web for answers
 - Open apps and launch links in your default apps
