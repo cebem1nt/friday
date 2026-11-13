@@ -11,10 +11,11 @@ FRIDAY_SOCKET_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.sock")
 FRIDAY_LOCK_PATH = os.path.join(os.environ["XDG_RUNTIME_DIR"], "friday.lock")
 FRIDAY_CACHE_DIR = os.path.join(CACHE_HOME, "friday")
 FRIDAY_CONFIG_DIR = os.path.join(CONFIG_HOME, "friday")
+FRIDAY_ICONS_DIR = os.getenv("FRIDAY_ICON_DIR", "/usr/local/lib/friday/assets/icons")
 
-# From papirus icon theme
-# TODO pack these icons with friday (if it's okay)
-FRIDAY_ICONS = [f"si-syncthing-{n}" for n in range(1, 12)]
+FRIDAY_ICONS = [
+    f"friday-think-{n}.svg" for n in range(1, 7)
+]
 
 THINKING_QUOTES = [
     quote.strip()
@@ -100,6 +101,27 @@ class Database:
 
 db = Database()
 
+def prefers_dark():
+    try:
+        result = subprocess.run(
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.freedesktop.portal.Desktop",
+                "--object-path", "/org/freedesktop/portal/desktop",
+                "--method", "org.freedesktop.portal.Settings.Read",
+                "org.freedesktop.appearance", "color-scheme"
+            ],
+            capture_output=True, text=True, timeout=2, check=True
+        )
+        return "uint32 1" in result.stdout
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return True # fallback to dark scheme
+
+def random_thinking_icon():
+    scheme = "dark" if prefers_dark() else "light"
+    icon = random.choice(FRIDAY_ICONS)
+    return os.path.join(FRIDAY_ICONS_DIR, scheme, icon)
+
 def random_thinking_quote():
     return random.choice(THINKING_QUOTES)
 
@@ -116,11 +138,10 @@ def notify(
     if not config.get("misc", "send_notifications", bool):
         return
 
-    icon = random.choice(FRIDAY_ICONS)
     args = [
         "notify-send", message, details,
             "-a", "friday", 
-            "-i", icon 
+            "-i", random_thinking_icon() 
     ]
 
     if is_syncronous:

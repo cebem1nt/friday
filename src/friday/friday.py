@@ -165,8 +165,9 @@ class Friday(Voice, Memory):
             ollama.chat(
                 model=self.model,
                 messages=[],
-                think=False if self.specs.thinking else None,
-                keep_alive=self.keep_alive
+                think=self.think,
+                keep_alive=self.keep_alive,
+                options={ "num_ctx": self.context_total }
             )
 
     def __reply_call_tools(self, tool_calls: list[dict]):
@@ -232,7 +233,7 @@ class Friday(Voice, Memory):
                 messages=self.get_messages(),
                 think=think if self.specs.thinking else None,
                 tools=self.tools.values() if self.tools else None,
-                keep_alive=config.get("ai", "keep_alive"),
+                keep_alive=self.keep_alive,
                 options={ "num_ctx": self.context_total }
             )
 

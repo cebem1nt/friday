@@ -25,4 +25,6 @@ fi
 source .venv/bin/activate
 mkdir -p "$HOME/.cache/friday/"
 
+export FRIDAY_ICON_DIR="$PWD/assets/icons/"
+
 exec ./friday --serve --log-level=4

@@ -1,8 +1,16 @@
-# Friday
+<h1 align="center">
+  <img src="assets/icons/friday.svg" alt="" width="50" style="vertical-align: middle;" />
+  <span style="vertical-align: middle;">Friday</span>
+</h1>
 
-**A local linux AI assistant that can actually get things done.** Talk to Friday, and it can search the web, open apps, run shell commands, work with your files and clipboard — all from your machine.
+<p align="center">
+  <strong>A local Linux AI assistant that can actually get things done.</strong><br />
+  Talk to Friday, and it can search the web, open apps, run shell commands, and work with your files and clipboard—all from your machine.
+</p>
 
-Friday uses Ollama for AI, Whisper for speech recognition, and Kokoro for speech. It runs in the background as an IPC server, ready to help from the command line or your desktop.
+<p align="center">
+  Friday uses Ollama for AI, Whisper for speech recognition, and Kokoro for speech. It runs in the background as an IPC server, ready to help from the command line or your desktop.
+</p>
 
 ## Features
 
@@ -295,9 +303,15 @@ options:
 ## TODOS
 
 - [ ] GUI in GTK 
-- [ ] Create normal packaging + systemd service
+- [x] Create normal packaging + systemd service
 - [x] Improve IPC communication, better schema
 - [x] More handling for runtime model change + improve reloading
 - [x] Per model system prompt support
 - [x] Integrations with gmail, google calendar
 - [x] Improved chat context management - sort of additional old chats summary prompt
+
+## Thanks
+
+- [Papirus Icon theme](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme) for syncthing icon looks
+- [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx) for TTS library
+- [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) for fast speech recognition library

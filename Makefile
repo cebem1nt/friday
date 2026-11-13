@@ -4,6 +4,7 @@ UV  := $(shell command -v uv)
 EXTRAS ?=
 EXTRA_ARGS := $(foreach extra,$(EXTRAS),--extra $(extra))
 USER_SYSTEMD_DIR := $(HOME)/.config/systemd/user
+ICON_THEME_DIR := /usr/local/share/icons/hicolor
 
 .PHONY: install uninstall install-app install-misc install-service uninstall-service
 
@@ -35,6 +36,8 @@ install-misc:
 
 	test -e ~/.config/friday/voices/voices-v1.0.bin || curl -L -o ~/.config/friday/voices/voices-v1.0.bin \
 		https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
+	
+	sudo install -D -m 0644 assets/icons/friday.svg $(ICON_THEME_DIR)/scalable/apps/friday.svg
 
 uninstall: uninstall-service
 	sudo rm -f /usr/local/bin/friday /usr/local/bin/fridayd
