@@ -76,13 +76,11 @@ In order to setup everything and install `friday` and `fridayd` (will also insta
 make install
 ```
 
-> [!NOTE]
-> 
-> *If you need multi-language support and GPU runtime for TTS and speech-to-text:* add these as EXTRAS
-> 
-> ```sh
-> make install EXTRAS="lang gpu"
-> ```
+*If you need multi-language support and GPU runtime for TTS and speech-to-text:* add these as EXTRAS
+
+```sh
+make install EXTRAS="lang gpu"
+```
 
 Uninstall with:
 
