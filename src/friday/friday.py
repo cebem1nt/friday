@@ -36,7 +36,6 @@ class Friday(Voice, Memory):
         self.model = config.get("ai", "model")
         self.specs = ModelSpecs(self.model)
         self.think = config.get("ai", "think", bool)
-        self.tools = {}
         self._reply_lock = threading.Lock()
 
         if not self.specs.thinking:
@@ -66,13 +65,13 @@ class Friday(Voice, Memory):
         self.__init_prompts()
 
     def __init_tools(self):
+        self.tools = {}
+
         if not self.specs.tools:
-            log.warn("Tools aren't supported by the model")
-            return
+            return log.warn("Tools aren't supported by the model")
 
         if not config.get("ai", "use_tools", bool):
-            log.info("Tools are disabled")
-            return
+            return log.info("Tools are disabled")
 
         from src.friday import tools # Triggers tools re-init too with -r
 
@@ -153,7 +152,8 @@ class Friday(Voice, Memory):
             return
 
         # If battery is not charging, we don't do that.
-        if not psutil.sensors_battery().power_plugged: 
+        battery = psutil.sensors_battery()
+        if battery and not battery.power_plugged: 
             return
 
         models = { m.name for m in ollama.ps().models }
@@ -206,15 +206,8 @@ class Friday(Voice, Memory):
         prompt: str,
         images: Optional[list[str]] = None, 
         audio: Optional[list[str]] = None,
-        model: Optional[str] = None,
         think: Optional[bool] = None
     ):
-        previous_model = None
-
-        if model is not None:
-            previous_model = self.model
-            self.set_model(model)      
-
         if think is None:
             think = self.think
 
@@ -295,10 +288,6 @@ class Friday(Voice, Memory):
                 self.update_context_used(int(match.group(1)))
                 continue
 
-            finally:
-                if previous_model is not None:
-                    self.set_model(previous_model)
-
         self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant", finish_turn=True)
         yield "system", "Stopped, tool-call limit was hit"
 
@@ -321,16 +310,21 @@ class Friday(Voice, Memory):
 
         def generator():
             memory_snapshot = None
+            previous_model = None
+            
+            with self._reply_lock:
+                if one_shot:
+                    memory_snapshot = self.wipe_context()
 
-            if one_shot:
-                memory_snapshot = self.wipe_context()
+                if model is not None:
+                    previous_model = self.model
+                    self.set_model(model)
 
-            try:
-                with self._reply_lock:
+                try:
                     is_thinking = False
                     output = ""
 
-                    for chunk_t, chunk in self.__reply(prompt, images, audio, model, think):
+                    for chunk_t, chunk in self.__reply(prompt, images, audio, think):
                         if chunk_t == "thinking" and not is_thinking:
                             if not silent and say_thinking_quote and config.get("misc", "enable_thinking_quotes", bool):
                                 self.say(shared.random_thinking_quote())
@@ -349,10 +343,13 @@ class Friday(Voice, Memory):
                     if notify_content:
                         shared.notify("Reply from friday", output)
                     
-                    return output
-            finally:
-                if memory_snapshot is not None:
-                    self.restore_context(memory_snapshot)
+                        return output
+                finally:
+                    if memory_snapshot is not None:
+                        self.restore_context(memory_snapshot)
+
+                    if previous_model is not None:
+                        self.set_model(previous_model)
 
         gen = generator()
 

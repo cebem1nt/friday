@@ -185,7 +185,9 @@ The `ddgs` provider searches the web using the Python library. The `ollama` prov
 
 ## Skills 
 
-Friday supports [Agent skills](https://agentskills.io/home), you can install skills to `~/.config/friday/skills/`. Example skill (save as ~/.config/friday/skills/good-morning/SKILL.md):
+Friday supports [Agent skills](https://agentskills.io/home), you can install skills to `~/.config/friday/skills/`. 
+
+Example skill (save as `~/.config/friday/skills/good-morning/SKILL.md`):
 
 ```md
 ---

@@ -16,6 +16,7 @@ class FridayThreadingUnixStreamServer(socketserver.ThreadingUnixStreamServer):
         from src.friday.friday import Friday
         self.fr = Friday()
         self.task_interval = task_interval
+        self.command_lock = threading.Lock()
         self._next_task = time.monotonic() + task_interval
 
     def service_actions(self):
@@ -54,6 +55,7 @@ class FridayServer(socketserver.StreamRequestHandler):
         log.info("Importing Friday, ollama...")
         from src.friday.friday import Friday
         config.parse() # re-parse config
+        self.server.fr.shut_up()
         self.server.fr = Friday()
         log.info("Friday was reloaded")
 
@@ -109,11 +111,19 @@ class FridayServer(socketserver.StreamRequestHandler):
             try:
                 request = json.loads(line)
                 log.info(f"Got request: {request}")
+                
+                fn = request.get("function")
 
-                if not self.__match_request(request):
-                    log.warn(f"Unknown function: {request.get('function')}")
+                if fn == "shut_up":
+                    handled = self.__match_request(request)
+                else:
+                    with self.server.command_lock:
+                        handled = self.__match_request(request)
+
+                if not handled:
+                    log.warn(f"Unknown function: {fn}")
                     self.__response_error("unknown request function")
-            
+
             except BrokenPipeError:
                 self.server.fr.unstage_turn()
 
