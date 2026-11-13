@@ -5,6 +5,7 @@ from pprint import pformat
 
 from src.friday.voice import Voice
 from src.friday.memory import Memory
+from src.friday import skills
 from src import config, log, shared
 
 import os, ollama, re, threading, psutil
@@ -83,6 +84,7 @@ class Friday(Voice, Memory):
 
         self.tools["clean_memory"] = self.clean_memory 
         self.tools["add_extra_context"] = self.add_extra_context 
+        self.tools["get_skill"] = skills.get_skill
 
         if tools.WEB_SEARCH_PROVIDER != "none":
             log.info("Friday: Web search is enabled")
@@ -99,6 +101,8 @@ class Friday(Voice, Memory):
         self.wipe_system_prompts()
         self.wipe_persistent_prompts()
 
+        self.add_system_prompt(f"Date today: {shared.today()}")
+
         system_prompt_file = SYSTEM_PROMPT_FILE
         model_system_prompt_file = os.path.join(shared.FRIDAY_CONFIG_DIR, self.model + '.md')
 
@@ -113,7 +117,28 @@ class Friday(Voice, Memory):
 
             self.add_system_prompt(content)
 
-        self.add_system_prompt(f"Date today: {shared.today()}")
+        if skills_list := skills.discover():
+            skill_bullets = "\n".join(f"- Name: {skill.name} - {skill.description}" for skill in skills_list)
+
+            skill_prompt = f"""
+            # Skill selection
+
+            Before answering the user, check whether any installed skill matches the request.
+            If skill matches:
+
+            1. Load it by calling the tool `get_skill` and passing the skill's exact name as its argument.
+            2. Do not call the skill name itself as a tool. For example, if the skill is named `good-morning`, call `get_skill` with `good-morning`; do not call a tool named `good-morning`.
+            3. Read and follow the instructions returned by `get_skill`, including any additional required tool calls.
+            4. If loading the skill fails, do not retry by calling the skill name as a tool. Continue using the instructions available to you, and do not claim the skill was loaded or its actions completed.
+
+            If no skill is relevant, respond normally. Do not load a skill merely because its name resembles something in the user's message.
+
+            ## Installed skills
+            
+            {skill_bullets}
+            """
+
+            self.add_system_prompt(skill_prompt.strip())
 
         if os.path.exists(EXTRA_CONTEXT_FILE):
             with open(EXTRA_CONTEXT_FILE) as f:
