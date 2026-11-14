@@ -72,8 +72,7 @@ Example configuration uses `gemma4:e2b` ollama model. Make sure the model is ava
 ollama pull gemma4:e2b
 ```
 
-<details open>
-  <summary><h3>System wide installation</h3></summary>
+### System wide installation
 
 In order to setup everything and install `friday` and `fridayd` (will also install and startup a systemd service for friday daemon): 
 
@@ -102,8 +101,6 @@ Uninstall with:
 ```sh
 make uninstall
 ```
-
-</details>
 
 <details>
   <summary><h3>Project setup / for development</h3></summary>
