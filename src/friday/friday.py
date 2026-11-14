@@ -36,7 +36,6 @@ class Friday(Voice, Memory):
         self.model = config.get("ai", "model")
         self.specs = ModelSpecs(self.model)
         self.think = config.get("ai", "think", bool)
-        self._reply_lock = threading.Lock()
 
         if not self.specs.thinking:
             log.info("Thinking is not supported by model")
@@ -240,7 +239,7 @@ class Friday(Voice, Memory):
                     msg = chunk.message
 
                     if chunk.done:
-                        self.update_context_used(chunk.prompt_eval_count + chunk.eval_count)
+                        self.context_used = chunk.prompt_eval_count + chunk.eval_count
 
                     if msg.content:
                         full_reply += msg.content
@@ -285,7 +284,7 @@ class Friday(Voice, Memory):
                     raise
 
                 log.debug("got ollama.ResponseError, tokens size exceeded, update self.context_used")
-                self.update_context_used(int(match.group(1)))
+                self.context_used = int(match.group(1))
                 continue
 
         self.add_message("I couldn't finish because the tool-call limit was reached.", role="assistant", finish_turn=True)
@@ -311,45 +310,44 @@ class Friday(Voice, Memory):
         def generator():
             memory_snapshot = None
             previous_model = None
-            
-            with self._reply_lock:
-                if one_shot:
-                    memory_snapshot = self.wipe_context()
 
-                if model is not None:
-                    previous_model = self.model
-                    self.set_model(model)
+            if one_shot:
+                memory_snapshot = self.wipe_context()
 
-                try:
-                    is_thinking = False
-                    output = ""
+            if model is not None:
+                previous_model = self.model
+                self.set_model(model)
 
-                    for chunk_t, chunk in self.__reply(prompt, images, audio, think):
-                        if chunk_t == "thinking" and not is_thinking:
-                            if not silent and say_thinking_quote and config.get("misc", "enable_thinking_quotes", bool):
-                                self.say(shared.random_thinking_quote())
-                            is_thinking = True
+            try:
+                is_thinking = False
+                output = ""
 
-                        if chunk_t == "response":
-                            if not silent:
-                                self.speak(chunk, generation)
-                            output += chunk
+                for chunk_t, chunk in self.__reply(prompt, images, audio, think):
+                    if chunk_t == "thinking" and not is_thinking:
+                        if not silent and say_thinking_quote and config.get("misc", "enable_thinking_quotes", bool):
+                            self.say(shared.random_thinking_quote())
+                        is_thinking = True
 
-                        yield chunk_t, chunk
+                    if chunk_t == "response":
+                        if not silent:
+                            self.speak(chunk, generation)
+                        output += chunk
 
-                    self.done_speaking(generation)
-                    log.debug(f"context used: {self.context_used}/{self.context_total}")
-                    
-                    if notify_content:
-                        shared.notify("Reply from friday", output)
-                    
-                        return output
-                finally:
-                    if memory_snapshot is not None:
-                        self.restore_context(memory_snapshot)
+                    yield chunk_t, chunk
 
-                    if previous_model is not None:
-                        self.set_model(previous_model)
+                self.done_speaking(generation)
+                log.debug(f"context used: {self.context_used}/{self.context_total}")
+                
+                if notify_content:
+                    shared.notify("Reply from friday", output)
+                
+                    return output
+            finally:
+                if memory_snapshot is not None:
+                    self.restore_context(memory_snapshot)
+
+                if previous_model is not None:
+                    self.set_model(previous_model)
 
         gen = generator()
 

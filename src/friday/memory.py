@@ -20,6 +20,43 @@ def estimate_tokens(messages: list[dict]):
 
     return (text // 3) + media
 
+class Turns:
+    def __init__(self):
+        os.makedirs(FRIDAY_CACHE_DIR, exist_ok=True)
+        self._file = os.path.join(FRIDAY_CACHE_DIR, "turns.json")
+        self.length = 0
+
+        wipe_context = config.get("misc", "wipe_chat_on_daemon_startup", bool)
+
+        if not os.path.exists(self._file) or wipe_context:
+            self.set([])
+
+    def get(self):
+        with open(self._file) as f:
+            out = json.load(f)
+            self.length = len(out)
+            return out
+
+    def set(self, turns: list[dict]):
+        with open(self._file, "w") as f:
+            json.dump(turns, f)
+
+    def append(self, turn: dict):
+        turns = self.get()
+        turns.append(turn)
+        self.length += 1
+
+        with open(self._file, "w") as f:
+            json.dump(turns, f)
+
+    def shift(self):
+        turns = self.get()
+        turns.pop(0)
+        self.length -= 1
+
+        with open(self._file, "w") as f:
+            json.dump(turns, f)
+
 class Memory:
     def __init__(self, context_total: int):
         self.context_used = 0
@@ -27,14 +64,7 @@ class Memory:
         self.context_reserve = config.get("misc", "context_reserve", int)
         self.context_target = self.context_total - self.context_reserve
 
-        os.makedirs(FRIDAY_CACHE_DIR, exist_ok=True)
-        self._turns_file = os.path.join(FRIDAY_CACHE_DIR, ".turns.json")
-        wipe_context = config.get("misc", "wipe_chat_on_daemon_startup", bool)
-
-        if not os.path.exists(self._turns_file) or wipe_context:
-            self.__set_turns([])
-
-        self.turns_length = 0
+        self.turns = Turns()
         self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
         
         if self.keep_recent_turns < 0:
@@ -44,7 +74,7 @@ class Memory:
         self._system_prompts: list[dict] = []
         self._current_turn: Optional[dict] = None
 
-    def __store_turn(self, turn: dict):
+    def archive(self, turn: dict):
         for message in turn["messages"]:
             role = message["role"]
 
@@ -55,32 +85,6 @@ class Memory:
                 continue
 
             db.add_message_entry(message["role"], message["content"])
-
-    def __get_turns(self) -> list[dict]:
-        with open(self._turns_file) as f:
-            out = json.load(f)
-            self.turns_length = len(out)
-            return out
-
-    def __set_turns(self, turns: list[dict]):
-        with open(self._turns_file, "w") as f:
-            json.dump(turns, f)
-
-    def __append_turn(self, turn: dict):
-        turns = self.__get_turns()
-        turns.append(turn)
-        self.turns_length += 1
-
-        with open(self._turns_file, "w") as f:
-            json.dump(turns, f)
-
-    def __shift_turn(self):
-        turns = self.__get_turns()
-        turns.pop(0)
-        self.turns_length -= 1
-
-        with open(self._turns_file, "w") as f:
-            json.dump(turns, f)
 
     def get_messages(
         self, 
@@ -93,7 +97,7 @@ class Memory:
         else:
             out = []
 
-        for turn in self.__get_turns():
+        for turn in self.turns.get():
             messages = turn["messages"]
 
             if not tool_calls:
@@ -113,12 +117,6 @@ class Memory:
             "content": content
         })
 
-    def wipe_system_prompts(self):
-        self._system_prompts = []
-
-    def wipe_persistent_prompts(self):
-        self.persistent_prompts = []
-
     def add_persistent_prompt(
         self, 
         content: str,
@@ -128,6 +126,12 @@ class Memory:
             "role": role,
             "content": content
         })
+
+    def wipe_system_prompts(self):
+        self._system_prompts = []
+
+    def wipe_persistent_prompts(self):
+        self.persistent_prompts = []
 
     def add_message(
         self,
@@ -156,10 +160,8 @@ class Memory:
             **extra
         }
 
-        if images:
-            message["images"] = images
-        if audio:
-            message["audio"] = audio
+        if images: message["images"] = images
+        if audio:  message["audio"] = audio
 
         self._current_turn["messages"].append(message)
 
@@ -168,8 +170,8 @@ class Memory:
             self.prune_context()
 
     def prune_context(self):        
-        removable = max(0, self.turns_length - self.keep_recent_turns)
-        turns = self.__get_turns()
+        removable = max(0, self.turns.length - self.keep_recent_turns)
+        turns = self.turns.get()
 
         while self.context_used > self.context_target and (removable > 0):
             oldest = turns[0]
@@ -177,7 +179,7 @@ class Memory:
             # This is an approximation
             self.context_used = max(0, self.context_used - oldest["tokens"])
 
-            self.__shift_turn()
+            self.turns.shift()
             turns.pop(0)
             removable -= 1
 
@@ -190,16 +192,19 @@ class Memory:
         finished = self._current_turn
         finished["tokens"] = estimate_tokens(finished["messages"])
 
-        self.__append_turn(finished)
-        self.__store_turn(finished)
+        self.turns.append(finished)
+        self.archive(finished)
 
+        self._current_turn = None
+
+    def unstage_turn(self):
         self._current_turn = None
 
     def wipe_context(self, soft: bool = False):
         log.info("Wiping current context")
-        previous_turns = self.__get_turns()
+        previous_turns = self.turns.get()
 
-        self.__set_turns([])
+        self.turns.set([])
 
         if not soft:
             self._current_turn = None
@@ -207,16 +212,7 @@ class Memory:
         return previous_turns
 
     def restore_context(self, turns: list[dict]):
-        self.__set_turns(turns)
-
-    def unstage_turn(self):
-        if self._current_turn is None:
-            return
-
-        self._current_turn = None
-
-    def update_context_used(self, used: int):
-        self.context_used = used
+        self.turns.set(turns)
 
     # Used as a tool by model
     def clean_memory(self):
