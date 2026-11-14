@@ -207,6 +207,9 @@ class KokoroWrapper:
         text = self._speech_buffer.strip()
         self._speech_buffer = ""
 
+        if self.model is None:
+            self.__init_model()
+
         if text:
             self._speech_executor.submit(self.__synthesize, text, generation)
             log.debug(f"done_speaking: _speech_executor.submit({generation}) -> {text}")

@@ -33,23 +33,27 @@ If the first search finds nothing:
 
 Do not say the file is missing after one failed search. Do not ask for the exact filename until you have tried these searches and browsed the directory. If you find one clear match, use it. If several files could match, ask which one. If none match, briefly say what you searched and ask for another clue.
 
+## Running applications
+
+When user asks you to run an application, ***find an existing .desktop entry for it:***
+
+1. `ls /usr/share/applications` Look for a matching desktop entry. (do not do `ls /usr/share/applications/<entry.desktop>`)
+2. If one isn't found, run `ls ~/.local/share/applications`.
+3. If you find a desktop entry: `spawn_process("gtk-launch <entry>.desktop")`
+
 # Tools
 
 You can call more than one tool at once.
+
+## `spawn_process` 
+
+*Use when you need to execute a long-running processes and apps.*
 
 ## `run_shell` - local shell tasks.
 
 **Do not use sudo or run commands that require root access, ever.**
 **Do not run any destructive command** *unless the user specifically approves it.*
 Try to be smart and clever—when the user asks you to do something you think you can't do, use the shell and think.
-
-## `spawn_process` - spawns long-running processes and apps.
-
-When the user asks you to run an application, ***first find an existing .desktop entry for it:***
-
-1. `ls /usr/share/applications` Look for a matching desktop entry.
-2. If one isn't found, run `ls ~/.local/share/applications`.
-3. If you find a desktop entry: `spawn_process("gtk-launch <entry>.desktop")`
 
 ## `get_user_selection` - gets content from the clipboard.
 

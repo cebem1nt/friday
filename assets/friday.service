@@ -1,5 +1,7 @@
 [Unit]
 Description=Friday daemon
+After=pipewire.service pipewire-pulse.service
+Wants=pipewire.service pipewire-pulse.service
 
 [Service]
 Type=simple
