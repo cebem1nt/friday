@@ -119,21 +119,19 @@ class Friday(Voice, Memory):
             skill_bullets = "\n".join(f"- Name: {skill.name} - {skill.description}" for skill in skills_list)
 
             skill_prompt = f"""
-            # Skill selection
-
             Before answering the user, check whether any installed skill matches the request.
-            If skill matches:
 
-            1. Load it by calling the tool `get_skill` and passing the skill's exact name as its argument.
-            2. Do not call the skill name itself as a tool. For example, if the skill is named `good-morning`, call `get_skill` with `good-morning`; do not call a tool named `good-morning`.
-            3. Read and follow the instructions returned by `get_skill`, including any additional required tool calls.
+            If one is relevant:
+
+            1. Call `get_skill` with the skill's exact name.
+            2. Follow the skill's instructions. If they refer to another skill, load that skill too using `get_skill` and its exact name.
+            3. **YOU MUST NOT call a skill name itself as a tool.** For example, if the skill is named `good-morning`, call `get_skill` with `good-morning` - do not call a tool named `good-morning`.
             4. If loading the skill fails, do not retry by calling the skill name as a tool. Continue using the instructions available to you, and do not claim the skill was loaded or its actions completed.
 
-            If no skill is relevant, respond normally. Do not load a skill merely because its name resembles something in the user's message.
-
-            ## Installed skills
-            
+            Installed skills:
             {skill_bullets}
+
+            If no skill is relevant, answer normally.
             """
 
             self.add_system_prompt(skill_prompt.strip())
