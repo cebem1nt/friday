@@ -20,7 +20,7 @@ def estimate_tokens(messages: list[dict]):
 
     return (text // 3) + media
 
-class Turns:
+class TurnsManager:
     def __init__(self):
         os.makedirs(FRIDAY_CACHE_DIR, exist_ok=True)
         self._file = os.path.join(FRIDAY_CACHE_DIR, "turns.json")
@@ -69,7 +69,7 @@ class Memory:
         self.context_reserve = config.get("misc", "context_reserve", int)
         self.context_target = self.context_total - self.context_reserve
 
-        self.turns = Turns()
+        self.turns = TurnsManager()
         self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
         self.preserve_tools = config.get("misc", "preserve_tool_responses", bool)
 

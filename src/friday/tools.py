@@ -200,35 +200,43 @@ if USE_GOOGLE_TOOLS:
             "In order to use google integrations, setup google OAauth project and save json credentials to credentials.json")
 
     creds = None
+    gmail_api = None
+    calendar_api = None
+    tasks_api = None
 
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, API_SCOPES)
+    def __load_google_api():
+        global creds, gmail_api, calendar_api, tasks_api
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDS_FILE, API_SCOPES
-            )
-            creds = flow.run_local_server(
-                port=0,
-                access_type="offline",
-                prompt="consent",
-            )
+        if os.path.exists(TOKEN_FILE):
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE, API_SCOPES)
 
-        with open(TOKEN_FILE, "w") as f:
-            f.write(creds.to_json())
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    CREDS_FILE, API_SCOPES
+                )
+                creds = flow.run_local_server(
+                    port=0,
+                    access_type="offline",
+                    prompt="consent",
+                )
 
+            with open(TOKEN_FILE, "w") as f:
+                f.write(creds.to_json())
 
-    gmail_api = __build_api("gmail", "v1", credentials=creds)
-    calendar_api = __build_api("calendar", "v3", credentials=creds)
-    tasks_api = __build_api("tasks", "v1", credentials=creds)
+        gmail_api = __build_api("gmail", "v1", credentials=creds)
+        calendar_api = __build_api("calendar", "v3", credentials=creds)
+        tasks_api = __build_api("tasks", "v1", credentials=creds)
 
     def get_calendar_events(date: Optional[str] = None):
         """
         Takes date in format: "%Y-%m-%d". If omitted - today
         """
+
+        if creds is None:
+            __load_google_api()
 
         calendar_info = calendar_api.calendars().get(calendarId="primary").execute()
 
@@ -264,6 +272,9 @@ if USE_GOOGLE_TOOLS:
         ])
 
     def get_google_tasks():
+        if creds is None:
+            __load_google_api()
+
         task_lists = tasks_api.tasklists().list().execute().get("items", [])
         out = {}
 
@@ -279,7 +290,8 @@ if USE_GOOGLE_TOOLS:
                     "title": task.get("title"),
                     "due": task.get("due"),
                     "notes": task.get("notes"),
-                    "id": task.get("id")
+                    "id": task.get("id"),
+                    "tasklist_id": task_list["id"],
                 }
                 for task in tasks
             ]
@@ -294,6 +306,9 @@ if USE_GOOGLE_TOOLS:
         """
         Takes date in format: "%Y-%m-%d". If omitted - today
         """
+        if creds is None:
+            __load_google_api()
+
         if not date:
             due = datetime.today().strftime("%Y-%m-%dT00:00:00.000Z")
         else:
@@ -313,18 +328,25 @@ if USE_GOOGLE_TOOLS:
 
         return "Task was created"
 
-    def complete_google_task(task_id: str):
+    def complete_google_task(tasklist_id: str, task_id: str):
+        if creds is None:
+            __load_google_api()
+
         tasks_api.tasks().patch(
-            tasklist="@default",
+            tasklist=tasklist_id,
             task=task_id,
             body={"status": "completed"},
         ).execute()
 
         return "Task was marked as completed"
 
-    def delete_google_task(task_id: str):
+
+    def delete_google_task(tasklist_id: str, task_id: str):
+        if creds is None:
+            __load_google_api()
+
         tasks_api.tasks().delete(
-            tasklist="@default",
+            tasklist=tasklist_id,
             task=task_id,
         ).execute()
 
@@ -349,6 +371,9 @@ if USE_GOOGLE_TOOLS:
         date_until: Optional[str] = None,
         unread_only: bool = True
     ):  
+        if creds is None:
+            __load_google_api()
+
         try:
             start_day = datetime.strptime(date_from, "%Y-%m-%d").date()
         except:

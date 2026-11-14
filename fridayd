@@ -30,4 +30,4 @@ fi
 set +a
 
 source .venv/bin/activate
-"$SHELL" -lic "./friday --serve --log-level=4"
+"$SHELL" -lic "exec ./friday --serve --log-level=4"
