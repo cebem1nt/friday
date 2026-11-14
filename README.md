@@ -87,6 +87,16 @@ make install
 make install EXTRAS="lang gpu"
 ```
 
+Then you have to enable systemd service:
+
+> [!NOTE]
+> Standalone window managers may not pass the graphical-session environment to `friday.service`, causing some features to fail (opening apps, opening content in apps). ***If that happens, start `fridayd` through your window manager’s autostart instead.***
+
+```
+systemctl --user daemon-reload
+systemctl --user enable --now friday.service
+```
+
 Uninstall with:
 
 ```sh
@@ -122,6 +132,14 @@ Run this to install default config file, voices and system prompt
 
 ```sh
 make install-misc
+```
+
+#### Start daemon
+
+You can start daemon via `./fridayd`:
+
+```sh
+./fridayd
 ```
 
 </details>

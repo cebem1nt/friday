@@ -22,8 +22,6 @@ install-app:
 
 install-service:
 	install -D -m 0644 assets/friday.service $(USER_SYSTEMD_DIR)/friday.service
-	systemctl --user daemon-reload
-	systemctl --user enable --now friday.service	
 
 install-misc:
 	mkdir -p ~/.config/friday/voices/

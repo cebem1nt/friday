@@ -181,7 +181,10 @@ class Friday(Voice, Memory):
             if function is None:
                 result = f"Unknown tool: {name}"
             else:
-                result = function(**args)
+                try:
+                    result = function(**args)
+                except Exception as e:
+                    result = str(e)
 
             log.debug(f"tool response -> {result}")
 
