@@ -33,7 +33,12 @@ class Turns:
 
     def get(self):
         with open(self._file) as f:
-            out = json.load(f)
+            try:
+                out = json.load(f)
+            except:
+                self.set([])
+                out = []
+
             self.length = len(out)
             return out
 
@@ -66,7 +71,8 @@ class Memory:
 
         self.turns = Turns()
         self.keep_recent_turns = config.get("misc", "keep_recent_turns", int)
-        
+        self.preserve_tools = config.get("misc", "preserve_tool_responses", bool)
+
         if self.keep_recent_turns < 0:
             raise ValueError("keep_recent_turns must be >= 0")
         
@@ -74,7 +80,7 @@ class Memory:
         self._system_prompts: list[dict] = []
         self._current_turn: Optional[dict] = None
 
-    def archive(self, turn: dict):
+    def archive_turn(self, turn: dict):
         for message in turn["messages"]:
             role = message["role"]
 
@@ -190,11 +196,17 @@ class Memory:
             return
 
         finished = self._current_turn
+
+        if not self.preserve_tools:
+            finished["messages"] = [
+                m for m in finished["messages"]
+                if m["role"] != "tool" and not m.get("tool_calls")
+            ]
+        
         finished["tokens"] = estimate_tokens(finished["messages"])
 
         self.turns.append(finished)
-        self.archive(finished)
-
+        self.archive_turn(finished)
         self._current_turn = None
 
     def unstage_turn(self):

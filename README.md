@@ -134,11 +134,12 @@ Friday is configured via `.ini` config file, take a look at [`~/.config/friday/c
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `model` | `gemma4:e4b` | Ollama model used for chat |
+| `model` | `gemma4:e2b` | Ollama model used for chat |
 | `think` | `true` | Enables thinking when supported by the model |
 | `use_tools` | `true` | Allows the model to use tools (any kind of advanced interaction) |
 | `keep_alive` | `30m` | How long Ollama keeps the model loaded after a message |
 | `num_ctx` | `16384` | Maximum context window configured for the model |
+| `preload` | `true` | Loads the Ollama model at startup |
 
 ### Text to speech (`[tts]`)
 
@@ -180,6 +181,8 @@ Speech recognition uses faster-whisper.
 | `log_thinking` | `false` | Logs the model's thinking process when running the daemon |
 | `use_google_tools` | `false` | Enable google integrations. [See section below](#google-integrations--gmail-tasks-and-calendar) |
 | `wipe_chat_on_daemon_startup` | `false` | Clears the active chat when the daemon starts |
+| `preserve_tool_responses` | `false` | Saves tool responses in chat history; setting it to `false` reduces context usage |
+| `thinking_quotes` | A list of phrases | Phrases Friday can say while thinking; used when `enable_thinking_quotes` is `true` |
 
 The `ddgs` provider searches the web using the Python library. The `ollama` provider uses Ollama's web-search functions and requires an `OLLAMA_API_KEY`. The `searxng` provider requires a SearXNG server with its JSON API enabled and additional python dependencies: `requests` and `trafilatura`.
 

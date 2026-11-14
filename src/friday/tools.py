@@ -532,6 +532,9 @@ def look_at_the_screen():
     return __("Screenshot of on-screen content", [out.stdout.strip()])
 
 def read_file(path: str):
+    path = os.path.expanduser(
+        os.path.expandvars(path))
+
     try:
         with open(path, "r") as f:
             return __(f.read())
