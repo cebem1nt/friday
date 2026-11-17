@@ -74,19 +74,14 @@ class Friday(Voice, Memory):
 
         from src.friday import tools # Triggers tools re-init too with -r
 
-        self.tools = { 
-            name: func
-            for name, func in getmembers(tools, isfunction)
-                if not name.startswith("__")
+        self.tools = {
+            name: getattr(tools, name) for name in tools.__all__
         }
 
         self.tools["clean_memory"] = self.clean_memory 
         self.tools["add_extra_context"] = self.add_extra_context 
         self.tools["get_skill"] = skills.get_skill
 
-        if tools.WEB_SEARCH_PROVIDER != "none":
-            log.info("Friday: Web search is enabled")
-        
         if not self.specs.vision:
             self.tools.pop("look_at_the_screen")
 
@@ -193,10 +188,10 @@ class Friday(Voice, Memory):
                 self.add_message(result, role="tool", tool_name=name)
             else:
                 self.add_message(
-                    result["content"], 
+                    result.content, 
                     role="tool", 
-                    images=result.get("images"),
-                    audio=result.get("audio"),
+                    images=result.images,
+                    audio=result.images,
                     tool_name=name
                 )                        
         
