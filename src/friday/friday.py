@@ -374,6 +374,7 @@ class Friday(Voice, Memory):
         
         if not prompt:
             shared.notify("Looks empty", "You didn't say anything, that's fine.")
+            return None
 
         shared.notify("Friday is thinking", f'"{prompt}" - Got it, preparing a response', True)
         return self.reply(prompt, stream=stream, notify_content=True)

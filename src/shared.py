@@ -148,7 +148,7 @@ def notify(
         args.append("-h")
         args.append(f"string:x-canonical-private-synchronous:{sys.argv[0]}")
 
-    subprocess.Popen(args)
+    subprocess.run(args)
 
 def parse_duration(value: str) -> float:
     value = value.strip().lower()

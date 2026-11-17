@@ -10,25 +10,13 @@ import subprocess, os, shutil, fnmatch, sys, base64
 
 WEB_SEARCH_PROVIDER = config.get("misc", "web_search_provider")
 MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
+TRIM_CONTENT = config.get("misc", "max_response_trim_content", bool)
 USE_GOOGLE_TOOLS = config.get("misc", "use_google_tools", bool)
 
 if MAX_TOOL_RESPONSE_LEN.lower() == "unlimited":
     MAX_TOOL_RESPONSE_LEN = float('inf')
 else:
     MAX_TOOL_RESPONSE_LEN = int(MAX_TOOL_RESPONSE_LEN)
-
-TRIM_CONTENT = config.get("misc", "max_response_trim_content", bool)
-
-APP_TYPES = {
-    "browser":      ("x-scheme-handler/https", "x-scheme-handler/http"),
-    "file_manager": ("inode/directory"),
-    "pdf_viewer":   ("application/pdf"),
-    "text_editor":  ("text/plain"),
-    "image_viewer": ("image/png"),
-    "video_player": ("video/mp4"),
-    "audio_player": ("audio/mpeg"),
-    "email_client": ("x-scheme-handler/mailto")
-}
 
 def __run(args: list[str]):
     return subprocess.run(
@@ -64,18 +52,6 @@ def __popen_shell(cmd: str):
         stderr=subprocess.PIPE,
         shell=True
     )
-
-def __query_default(app: str) -> Optional[str]:
-    mime_types = APP_TYPES[app]
-
-    for mime_type in mime_types:
-        out =__run(["xdg-mime", "query", "default", mime_type])
-        app_id = out.stdout.strip()
-
-        if out.returncode == 0 and app_id:
-            return app_id
-    
-    return None
 
 # Use to wrap tool responses
 def __(
@@ -446,22 +422,24 @@ def run_shell(cmd: str):
 
 def type_content(content: str):
     """
-    Types/writes given content to user's active input field
+    Pastes given content into user's active input field
     """
 
+    paste_to_user_selection(content)
+
     if os.environ.get("WAYLAND_DISPLAY"):
-        command = ["wtype", content]
+        command = ["wtype", "-M", "ctrl", "-k", "v", "-m", "ctrl"]
     else:
-        command = ["xdotool", "type", "--clearmodifiers", content]
+        command = ["xdotool", "key", "--clearmodifiers", "ctrl+v"]
 
     try:
         proc = __run(command)
         if proc.returncode != 0:
             return f"{command[0]} failed!"
     except FileNotFoundError:
-        return f"Could not type content {command[0]} is not installed!"
+        return f"Could not paste content {command[0]} is not installed!"
 
-    return "Content was typed successfully"
+    return "Content was pasted successfully"
 
 def spawn_process(cmd: str):
     try:
@@ -632,58 +610,4 @@ def search_files(
 def time_now():
     return __(datetime.now())
 
-# TODO these reminders and timers are very fragile and
-# might be confusing for the model. Needs rework
-
-# TODO possibly more sophisticated reminders system
-
-# def set_timer(
-#     hours: int,
-#     minutes: int, 
-#     seconds: int,
-#     content: str
-# ):
-#     total = seconds + (minutes * 60) + (hours * 60 * 60) 
-#     message = f"This is a message from timer - {content}"
-
-#     try:
-#         subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
-#     except:
-#         return "Could not set timer!"
-
-#     return "Timer was set!"
-
-# def remind_at(
-#     hours: int,
-#     minutes: int, 
-#     seconds: int,
-#     content: str
-# ):
-#     now = datetime.now()
-#     target = now.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
-
-#     if target <= now:
-#         target += timedelta(days=1) # Won't survive if host turns off
-
-#     message = f"This is a message from reminder - {content}"
-
-#     if shutil.which("at"):
-#         try:
-#             subprocess.run(
-#                 ["at", "-t", target.strftime("%Y%m%d%H%M.%S")],
-#                 input=f"{sys.argv[0]} -a '{message}'\n", 
-#                 text=True, 
-#                 check=True
-#             )
-#             return "Reminder was set!"
-#         except (OSError, subprocess.CalledProcessError):
-#             pass
-
-#     try:
-#         total = (target - now).total_seconds()
-#         subprocess.Popen(f"sleep {total} && {sys.argv[0]} -a '{message}'", shell=True)
-#     except:
-#         return "Could not set reminder!"
-
-#     return "Reminder was set!"
 
