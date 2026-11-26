@@ -1,6 +1,8 @@
 from typing import Any, Optional
 from src import config
 
+import subprocess
+
 MAX_TOOL_RESPONSE_LEN = config.get("misc", "max_tool_response_length")
 TRIM_CONTENT = config.get("misc", "max_response_trim_content", bool)
 

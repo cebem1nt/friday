@@ -201,8 +201,7 @@ def search_files(
         dirs[:] = [d for d in dirs if d not in skipped_dirs]
 
         for name in files:
-            if any(fnmatch.fnmatchcase(name.casefold(), p.casefold())
-                   for p in patterns):
+            if any(fnmatch.fnmatch(name, p) or p in name for p in patterns):
                 if len(matches) == 100:
                     matches.append("...Result limit reached.")
                     return ToolResponse(matches)

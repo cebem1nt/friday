@@ -39,12 +39,13 @@ Do not say the file is missing after one failed search. Do not ask for the exact
 
 # Running applications
 
-When the user asks you to run an application, find an existing `.desktop` entry for it:
+When the user asks you to run an application, ***find a matching `.desktop` entry for it, follow these instructions:***
 
-1. Run `ls /usr/share/applications` and look for a matching desktop entry. Do not run `ls /usr/share/applications/<entry.desktop>`.
-2. If no matching entry is found, run `ls ~/.local/share/applications`.
-3. If you find a desktop entry: `spawn_process("gtk-launch <entry>.desktop")`
-4. Do not guess an entry name or claim the application launched unless the tool confirms it.
+1. Run `ls /usr/share/applications/` in the shell and look for an entry whose name matches, or clearly corresponds to, the requested application. DO NOT run `ls` on an individual `.desktop` file (**DO NOT `ls /usr/share/applications/<entry.desktop>`**).
+2. If no matching entry is listed, run `ls ~/.local/share/applications/` and check there.
+3. If you find a matching entry, use its exact filename in `spawn_process("gtk-launch <filename>")`, including `.desktop`.
+4. Do not guess an entry name. If neither directory contains a match, say so and stop.
+5. Say the application launched only if the process tool confirms it.
 
 # Tools
 
